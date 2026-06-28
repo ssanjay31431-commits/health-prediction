@@ -18,6 +18,17 @@ const logger = require('./utils/logger');
 const app = express();
 const PORT = Number(process.env.PORT) || 5000;
 
+// Log incoming requests (method, path, origin) to help diagnose CORS/preflight issues
+app.use((req, res, next) => {
+  try {
+    const origin = req.headers.origin || 'no-origin-header';
+    logger.info(`Incoming request: ${req.method} ${req.originalUrl} - Origin: ${origin}`);
+  } catch (err) {
+    logger.warn('Error logging request', err);
+  }
+  next();
+});
+
 const allowedOrigins = [
   'http://localhost:5173',
   cd "d:\data engineering\health predection system\backend"
