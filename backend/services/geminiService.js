@@ -2,16 +2,15 @@ const axios = require('axios');
 const logger = require('../utils/logger');
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-1.0';
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gpt-4.1-mini';
+const OPENAI_API_URL = process.env.OPENAI_API_URL || 'https://api.openai.com/v1/responses';
 
-// This service calls the Gemini API. If API key not present, it returns a simple heuristic fallback.
+// This service calls a generative AI API. If API key is not present, it falls back to a heuristic.
 exports.predict = async ({ glucose, haemoglobin, cholesterol }) => {
-  // Build prompt
   const prompt = `Given glucose=${glucose}, haemoglobin=${haemoglobin}, cholesterol=${cholesterol}, provide: Possible Condition, Reason, Recommendation in JSON.`;
 
   if (!GEMINI_API_KEY) {
     logger.warn('GEMINI_API_KEY not set, using fallback heuristic');
-    // Simple heuristic
     let possibleCondition = 'Normal';
     let reason = 'All values within typical ranges.';
     let recommendation = 'Maintain healthy lifestyle.';
@@ -34,26 +33,34 @@ exports.predict = async ({ glucose, haemoglobin, cholesterol }) => {
   }
 
   try {
-    const res = await axios.post('https://api.gemini.example/v1/generate', {
-      model: GEMINI_MODEL,
-      prompt,
-      max_tokens: 300
-    }, {
-      headers: {
-        Authorization: `Bearer ${GEMINI_API_KEY}`,
-        'Content-Type': 'application/json'
+    const res = await axios.post(
+      OPENAI_API_URL,
+      {
+        model: GEMINI_MODEL,
+        input: prompt,
+        max_tokens: 300,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${GEMINI_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
       }
-    });
+    );
 
-    // Parse response depending on Gemini shape. Expecting text with JSON.
-    const text = res.data?.output || res.data?.choices?.[0]?.text || JSON.stringify(res.data);
+    const outputText =
+      res.data?.output?.[0]?.content?.find((item) => item.type === 'output_text')?.text ||
+      res.data?.output?.[0]?.content?.[0]?.text ||
+      res.data?.choices?.[0]?.message?.content ||
+      res.data?.choices?.[0]?.text;
+    const text = outputText || JSON.stringify(res.data);
+
     try {
       const parsed = JSON.parse(text);
       return parsed;
     } catch (parseErr) {
-      // Fallback: attempt to extract the JSON substring
-      const m = text.match(/\{[\s\S]*\}/);
-      if (m) return JSON.parse(m[0]);
+      const match = text.match(/\{[\s\S]*\}/);
+      if (match) return JSON.parse(match[0]);
       return { possibleCondition: text, reason: '', recommendation: '' };
     }
   } catch (err) {

@@ -33,15 +33,18 @@ const allowedOrigins = [
   'http://localhost:5173',
   'https://healthpredict.netlify.app',
   'https://phenomenal-tiramisu-43fd29.netlify.app',
-];
+  'https://health-prediction-kl7y.onrender.com',
+  process.env.FRONTEND_URL,
+].filter(Boolean);
 
 const corsOptions = {
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
+    if (!origin || allowedOrigins.includes(origin) || process.env.ALLOW_ANY_ORIGIN === 'true') {
       callback(null, true);
-    } else {
-      callback(new Error(`CORS policy blocked origin: ${origin}`));
+      return;
     }
+
+    callback(new Error(`CORS policy blocked origin: ${origin}`));
   },
   // Ensure legacy browsers and some preflight checks receive a 200 OK
   optionsSuccessStatus: 200,

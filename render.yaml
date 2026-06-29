@@ -20,6 +20,12 @@ services:
         sync: false
       - key: GMAIL_PASSWORD
         sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gpt-4.1-mini
+      - key: FRONTEND_URL
+        sync: false
 
   - type: static
     name: health-prediction-frontend
