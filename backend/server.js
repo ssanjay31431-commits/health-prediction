@@ -37,14 +37,19 @@ const allowedOrigins = [
   process.env.FRONTEND_URL,
 ].filter(Boolean);
 
+const normalizedOrigin = (origin) => (origin || '').trim();
+const isNetlifyOrigin = (origin) => /^https:\/\/[A-Za-z0-9-]+\.netlify\.app$/.test(origin);
+const isRenderOrigin = (origin) => /^https:\/\/[A-Za-z0-9-]+\.onrender\.com$/.test(origin);
+
 const corsOptions = {
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin) || process.env.ALLOW_ANY_ORIGIN === 'true') {
+    const normalized = normalizedOrigin(origin);
+    if (!normalized || allowedOrigins.includes(normalized) || isNetlifyOrigin(normalized) || isRenderOrigin(normalized) || process.env.ALLOW_ANY_ORIGIN === 'true') {
       callback(null, true);
       return;
     }
 
-    callback(new Error(`CORS policy blocked origin: ${origin}`));
+    callback(new Error(`CORS policy blocked origin: ${normalized}`));
   },
   // Ensure legacy browsers and some preflight checks receive a 200 OK
   optionsSuccessStatus: 200,
