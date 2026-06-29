@@ -1,1 +1,2 @@
-/*    /index.html   200
+npm i -g netlify-cli
+netlify deploy --prod --dir=frontend/dist --site <SITE_ID> --auth $NETLIFY_AUTH_TOKEN/*    /index.html   200
