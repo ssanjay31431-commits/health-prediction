@@ -14,19 +14,28 @@ const SUPPORT_EMAIL = SUPPORT_EMAIL_ENV?.trim();
 const RESEND_OWNER_EMAIL = RESEND_OWNER_EMAIL_ENV?.trim();
 const adminRecipient = RESEND_OWNER_EMAIL || SUPPORT_EMAIL || 'ssanjay31431@gmail.com';
 
-logger.info(
-  `Resend configuration: apiKeyPresent=${Boolean(RESEND_API_KEY)}, ` +
-  `ownerEmailPresent=${Boolean(RESEND_OWNER_EMAIL)}, supportEmailPresent=${Boolean(SUPPORT_EMAIL)}, ` +
-  `adminRecipient=${adminRecipient}`
-);
-
-const resendConfigured = Boolean(RESEND_API_KEY);
-const resendClient = resendConfigured ? new Resend(RESEND_API_KEY) : null;
-const resendFromAddress = RESEND_FROM_EMAIL || 'Health Prediction <onboarding@resend.dev>';
-
-if (!resendConfigured) {
-  logger.warn('RESEND_API_KEY is not configured in backend/.env. Email delivery will fail until RESEND_API_KEY is provided.');
+function formatKeyPrefix(key) {
+  if (!key || typeof key !== 'string') return 'N/A';
+  const prefix = key.startsWith('re_') ? key.slice(0, 7) : key.slice(0, 4);
+  return `${prefix}***`;
 }
+
+const resendApiKeyLoaded = Boolean(RESEND_API_KEY);
+const resendApiKeyValid = resendApiKeyLoaded && RESEND_API_KEY.startsWith('re_');
+
+console.log('================================');
+console.log('Resend Configuration');
+console.log(`RESEND_API_KEY Loaded: ${resendApiKeyLoaded ? 'YES' : 'NO'}`);
+console.log(`Key Prefix: ${resendApiKeyLoaded ? formatKeyPrefix(RESEND_API_KEY) : 'N/A'}`);
+console.log('================================');
+
+if (!resendApiKeyValid) {
+  throw new Error('RESEND_API_KEY is missing or invalid.');
+}
+
+const resendConfigured = true;
+const resendClient = new Resend(RESEND_API_KEY);
+const resendFromAddress = RESEND_FROM_EMAIL || 'Health Prediction <onboarding@resend.dev>';
 
 async function sendMail(mailOptions) {
   const options = {
@@ -51,11 +60,9 @@ async function sendMail(mailOptions) {
     text: options.text
   };
 
-  console.log('RESEND_API_KEY loaded:', !!process.env.RESEND_API_KEY);
-  console.log('RESEND_FROM_EMAIL:', process.env.RESEND_FROM_EMAIL);
-  console.log('SUPPORT_EMAIL:', process.env.SUPPORT_EMAIL);
-  console.log('RESEND_OWNER_EMAIL:', process.env.RESEND_OWNER_EMAIL);
-  console.log('Sending email...');
+  console.log('Recipient:', options.to);
+  console.log('From Address:', options.from);
+  console.log('Subject:', payload.subject);
   console.log('=== Sending Payload ===');
   console.log(JSON.stringify(payload, null, 2));
   logger.info(`Sending email to ${options.to} with subject "${payload.subject}"`);

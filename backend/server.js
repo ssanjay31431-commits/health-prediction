@@ -3,6 +3,7 @@ require('dotenv').config({ path: path.join(__dirname, '.env') });
 const express = require('express');
 const cors = require('cors');
 const connectDB = require('./config/db');
+const emailService = require('./services/emailService');
 const patientRoutes = require('./routes/patientRoutes');
 const predictRoutes = require('./routes/predictRoutes');
 const authRoutes = require('./routes/authRoutes');
