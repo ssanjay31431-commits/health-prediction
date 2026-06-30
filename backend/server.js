@@ -11,88 +11,15 @@ const adminRoutes = require('./routes/adminRoutes');
 const settingRoutes = require('./routes/settingRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const pendingRequestRoutes = require('./routes/pendingRequestRoutes');
-const emailController = require('./controllers/emailController');
 const authenticateToken = require('./middleware/authenticateToken');
 const errorHandler = require('./middleware/errorHandler');
 const logger = require('./utils/logger');
 
 const app = express();
 const PORT = Number(process.env.PORT) || 5000;
+const PORT_FROM_ENV = typeof process.env.PORT !== 'undefined';
 
-// Log incoming requests (method, path, origin) to help diagnose CORS/preflight issues
-app.use((req, res, next) => {
-  try {
-    const origin = req.headers.origin || 'no-origin-header';
-    logger.info(`Incoming request: ${req.method} ${req.originalUrl} - Origin: ${origin}`);
-  } catch (err) {
-    logger.warn('Error logging request', err);
-  }
-  next();
-});
-
-const allowedOrigins = [
-  'http://localhost:5173',
-  'http://127.0.0.1:5173',
-  process.env.FRONTEND_URL,
-].filter(Boolean);
-
-const normalizedOrigin = (origin) => (origin || '').trim();
-const isVercelOrigin = (origin) => /^https:\/\/[A-Za-z0-9-]+\.vercel\.app$/.test(origin);
-const isNetlifyOrigin = (origin) => /^https:\/\/([A-Za-z0-9-]+)\.netlify\.app$/.test(origin);
-
-const isOriginAllowed = (origin) => {
-  const normalized = normalizedOrigin(origin);
-  return (
-    !normalized ||
-    allowedOrigins.includes(normalized) ||
-    isVercelOrigin(normalized) ||
-    isNetlifyOrigin(normalized) ||
-    process.env.ALLOW_ANY_ORIGIN === 'true'
-  );
-};
-
-const corsOptions = {
-  origin: (origin, callback) => {
-    if (isOriginAllowed(origin)) {
-      callback(null, true);
-      return;
-    }
-
-    // Reject without throwing so disallowed origins get a clean CORS block
-    // (missing Access-Control-Allow-Origin) instead of a 500 error.
-    logger.warn(`CORS: origin not allowed: ${normalizedOrigin(origin)}`);
-    callback(null, false);
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  optionsSuccessStatus: 200,
-};
-
-app.use(cors(corsOptions));
-app.options('*', cors(corsOptions));
-// Fallback headers: ensure preflight responses include CORS headers
-// This helps in environments where a proxy or host strips CORS headers.
-app.use((req, res, next) => {
-  try {
-    const origin = req.headers.origin || process.env.FRONTEND_URL || '';
-    if (process.env.ALLOW_ANY_ORIGIN === 'true') {
-      res.setHeader('Access-Control-Allow-Origin', '*');
-    } else if (origin) {
-      res.setHeader('Access-Control-Allow-Origin', origin);
-    }
-
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
-    // expose credentials header when needed
-    if (process.env.ALLOW_CREDENTIALS === 'true') {
-      res.setHeader('Access-Control-Allow-Credentials', 'true');
-    }
-  } catch (err) {
-    logger.warn('Error setting fallback CORS headers', err);
-  }
-  next();
-});
+app.use(cors());
 app.use(express.json());
 
 // Auth routes (public)
@@ -100,9 +27,6 @@ app.use('/api/auth', authRoutes);
 
 // Pending request routes (public for email links, protected for admin)
 app.use('/api/pending-requests', pendingRequestRoutes);
-
-// Public temporary email test endpoint for deployment verification
-app.post('/api/email/test', emailController.sendTestEmailPublic);
 
 // Protected routes - require authentication
 app.use('/api/patients', authenticateToken, patientRoutes);
@@ -113,7 +37,6 @@ app.use('/api/settings', settingRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 
 app.get('/', (req, res) => res.json({ status: 'ok' }));
-app.get('/api/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
 
 app.use(errorHandler);
 
@@ -124,8 +47,8 @@ const start = async () => {
     if (dbStatus?.error) logger.warn(dbStatus.error.message || dbStatus.error);
   }
 
-  // Attempt to listen on the requested port, but fall back to the next available port if it is already busy.
-  const maxRetries = 100;
+  // Attempt to listen on PORT. If PORT was explicitly set via env, fail-fast on EADDRINUSE.
+  const maxRetries = PORT_FROM_ENV ? 1 : 10;
   let attempt = 0;
   let currentPort = PORT;
 
@@ -139,6 +62,11 @@ const start = async () => {
 
     server.on('error', (err) => {
       if (err && err.code === 'EADDRINUSE') {
+        if (PORT_FROM_ENV) {
+          logger.error(`Port ${currentPort} is already in use. Stop the process using it or set a different PORT environment variable.`);
+          process.exit(1);
+        }
+
         logger.warn(`Port ${currentPort} in use, attempting next port... (attempt ${attempt}/${maxRetries})`);
         server.close?.();
         if (attempt < maxRetries) {

@@ -40,6 +40,9 @@ async function sendMail(mailOptions) {
     text: options.text
   };
 
+  console.log('Sending email...');
+  logger.info(`Sending email to ${options.to} with subject "${payload.subject}"`);
+
   if (options.attachments?.length) {
     payload.attachments = options.attachments.map((attachment) => ({
       name: attachment.filename || attachment.name,
@@ -55,15 +58,21 @@ async function sendMail(mailOptions) {
     // Log full response id/status for observability in production logs
     try {
       const messageId = resp?.id || resp?.messageId || null;
-      logger.info(`Email sent to ${options.to} via Resend; messageId=${messageId}`);
+      console.log('Email sent successfully');
+      console.log(`Email sent successfully to ${options.to} via Resend; messageId=${messageId}`);
+      logger.info(`Email sent successfully to ${options.to} via Resend; messageId=${messageId}`);
     } catch (e) {
-      logger.info(`Email sent to ${options.to} via Resend (response logged)`);
+      console.log('Email sent successfully');
+      console.log(`Email sent successfully to ${options.to} via Resend`);
+      logger.info(`Email sent successfully to ${options.to} via Resend (response logged)`);
     }
 
     return { ok: true, provider: 'resend', response: resp };
   } catch (error) {
     // Log full error for debugging (may include HTTP response body)
+    console.error(`Resend delivery failed for ${options.to}: ${error && error.message}`);
     logger.error(`Resend delivery failed for ${options.to}: ${error && error.message}`, { error });
+    logger.error('Resend payload:', payload);
 
     // Special-case: Resend test-mode validation error prevents sending to arbitrary addresses.
     // If configured, retry sending to a verified owner address so admin notices can still arrive.
@@ -273,6 +282,55 @@ async function sendAdminAccountRequestNotification(request) {
   return sendMail(options);
 }
 
+function buildAdminPasswordResetRequestBody(admin) {
+  const clientUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+  return {
+    html: `
+      <div style="font-family: Arial, sans-serif; color: #1f2937; line-height: 1.6; max-width: 600px; margin: 0 auto;">
+        <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+          <h2 style="margin: 0; color: #0d47a1;">🏥 Health Prediction System</h2>
+          <p style="margin: 5px 0 0 0; color: #666;">Password Reset Requested</p>
+        </div>
+        <p>Dear Super Admin,</p>
+        <p>An admin account has requested a password reset.</p>
+        <div style="background-color: #f9fafb; border-left: 4px solid #0d47a1; padding: 16px; margin: 20px 0; border-radius: 4px;">
+          <p style="margin: 0 0 10px 0;"><strong>Username:</strong> ${admin.username}</p>
+          <p style="margin: 0 0 10px 0;"><strong>Email:</strong> ${admin.email}</p>
+          <p style="margin: 0 0 10px 0;"><strong>Full Name:</strong> ${admin.fullName || 'N/A'}</p>
+        </div>
+        <p>Use the admin panel to approve or reject this password reset request.</p>
+        <p style="color: #999; font-size: 12px; margin-top: 20px;">Thank you,<br />Health Prediction System</p>
+      </div>
+    `,
+    text: `🏥 Health Prediction System
+
+A password reset request has been submitted.
+
+Username: ${admin.username}
+Email: ${admin.email}
+Full Name: ${admin.fullName || 'N/A'}
+
+Use the admin panel to approve or reject this request.
+
+Thank you,
+Health Prediction System`
+  };
+}
+
+async function sendAdminPasswordResetRequestNotification(admin) {
+  const adminRecipient = adminRecipientFallback;
+  const emailContent = buildAdminPasswordResetRequestBody(admin);
+
+  const options = {
+    to: adminRecipient,
+    subject: `Password Reset Requested for ${admin.username}`,
+    html: emailContent.html,
+    text: emailContent.text
+  };
+
+  return sendMail(options);
+}
+
 async function sendPasswordReset(admin, resetToken) {
   const options = {
     to: admin.email,
@@ -381,6 +439,7 @@ module.exports = {
   sendHighRiskAlert,
   sendBulkHighRiskAlerts,
   sendPasswordReset,
+  sendAdminPasswordResetRequestNotification,
   sendAccountRequestNotification,
   sendAdminAccountRequestNotification
 };

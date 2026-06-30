@@ -13,11 +13,14 @@ exports.sendEmailToPatient = async (req, res, next) => {
 
     try {
       const pdfBuffer = await generatePatientReportPdf(patient);
+      logger.info('Sending email...');
       const result = await sendPatientReport(patient, pdfBuffer);
       if (result.error) {
         logger.warn(`Patient report email failed for ${patient.email}: ${result.message}`);
+        logger.error('Email send error details:', result.detail || result);
         return res.status(500).json({ message: 'Email delivery attempted but failed. Please verify Resend configuration and valid recipient addresses.', success: false, warning: result.message });
       }
+      logger.info('Email sent successfully');
       return res.json({ message: 'Email delivered successfully with PDF report attached.', success: true });
     } catch (emailError) {
       logger.warn(`Patient report email failed for ${patient.email}: ${emailError.message}`);

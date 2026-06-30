@@ -44,7 +44,7 @@ const generatePatientReportPdf = (patient) => {
       const resultLabel = prediction.toLowerCase().includes('high') ? 'Positive' : 'Negative';
       const statusLabel = prediction.toLowerCase().includes('high') ? 'High Risk' : 'Normal';
       const website = process.env.FRONTEND_URL || 'Health Prediction System';
-      const supportEmail = process.env.SUPPORT_EMAIL || 'support@healthprediction.com';
+      const supportEmail = process.env.SUPPORT_EMAIL || process.env.EMAIL_USER || 'support@healthprediction.com';
 
       if (logoPath) {
         try {
@@ -182,10 +182,14 @@ exports.createPatient = async (req, res, next) => {
 
     try {
       const pdfBuffer = await generatePatientReportPdf(patient);
+      logger.info('Sending email...');
       const emailResult = await sendPatientReport(patient, pdfBuffer);
       if (emailResult?.error) {
         responseMessage = 'Patient saved successfully, but the report email could not be delivered.';
         logger.warn(`Report email failed for patient ${patient._id || patient.id}: ${emailResult.message}`);
+        logger.error('Email send error details:', emailResult.detail || emailResult);
+      } else {
+        logger.info('Email sent successfully');
       }
     } catch (emailError) {
       responseMessage = 'Patient saved successfully, but the report email could not be delivered.';

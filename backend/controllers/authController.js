@@ -1,7 +1,7 @@
 const Admin = require('../models/Admin');
 const jwt = require('jsonwebtoken');
 const logger = require('../utils/logger');
-const { sendPasswordReset } = require('../services/emailService');
+const { sendPasswordReset, sendAdminPasswordResetRequestNotification, sendAdminAccountRequestNotification } = require('../services/emailService');
 
 const SUPER_ADMIN_USERNAME = process.env.SUPER_ADMIN_USERNAME || 'PAVI';
 const SUPER_ADMIN_PASSWORD = process.env.SUPER_ADMIN_PASSWORD || 'Pavi@123';
@@ -254,15 +254,30 @@ exports.forgotPassword = async (req, res) => {
     const resetToken = admin.generateResetToken();
     await admin.save();
 
+    logger.info('Sending email...');
     const emailResult = await sendPasswordReset(admin, resetToken);
-    logger.info(`Password reset OTP generated for admin: ${admin.username}`);
-
     if (emailResult?.error) {
       logger.error(`Password reset email failed for ${admin.email}: ${emailResult.message}`);
+      logger.error('Email send error details:', emailResult.detail || emailResult);
       return res.status(500).json({
         success: false,
         message: 'Failed to send password reset email. Please try again later.'
       });
+    }
+
+    logger.info('Email sent successfully');
+    logger.info(`Password reset OTP generated for admin: ${admin.username}`);
+
+    try {
+      logger.info('Sending email...');
+      const adminNotifyResult = await sendAdminPasswordResetRequestNotification(admin);
+      if (adminNotifyResult?.error) {
+        logger.error(`Failed to send Super Admin notification for password reset request: ${adminNotifyResult.message}`);
+      } else {
+        logger.info('Email sent successfully');
+      }
+    } catch (adminNotifyError) {
+      logger.error('Super Admin password reset notification failed:', adminNotifyError);
     }
 
     const responsePayload = {
@@ -373,7 +388,6 @@ exports.requestAccountCreation = async (req, res) => {
   try {
     const { fullName, username, email, mobile, password, confirmPassword, role } = req.body;
     const PendingRequest = require('../models/PendingRequest');
-    const { sendAdminAccountRequestNotification } = require('../services/emailService');
 
     // Validation
     if (!fullName || !username || !email || !mobile || !password || !confirmPassword) {
@@ -463,19 +477,18 @@ exports.requestAccountCreation = async (req, res) => {
 
     await pendingRequest.save();
 
-    logger.info(`Account creation request submitted: ${username}`);
+    // Send notification email to system admin
+    logger.info('Sending email...');
+    const emailResult = await sendAdminAccountRequestNotification(pendingRequest);
+    if (emailResult?.error) {
+      logger.error(`Failed to send account request email: ${emailResult.message}`);
+      logger.error('Email send error details:', emailResult.detail || emailResult);
+      // Don't fail the request even if email fails
+    } else {
+      logger.info('Email sent successfully');
+    }
 
-    // Send notification email to system admin in the background so a slow or
-    // unreachable SMTP server never blocks the HTTP response.
-    sendAdminAccountRequestNotification(pendingRequest)
-      .then((emailResult) => {
-        if (emailResult?.error) {
-          logger.error(`Failed to send account request email: ${emailResult.message}`);
-        }
-      })
-      .catch((err) => {
-        logger.error(`Failed to send account request email: ${err.message}`);
-      });
+    logger.info(`Account creation request submitted: ${username}`);
 
     return res.status(201).json({
       success: true,

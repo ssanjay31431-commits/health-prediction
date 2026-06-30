@@ -89,6 +89,71 @@ exports.approveAccountRequest = async (req, res) => {
     request.approvedAt = new Date();
     await request.save();
 
+    const clientUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const approvalEmailHtml = `
+      <div style="font-family: Arial, sans-serif; color: #1f2937; line-height: 1.6; max-width: 600px; margin: 0 auto;">
+        <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+          <h2 style="margin: 0; color: #0d47a1;">🏥 Health Prediction System</h2>
+          <p style="margin: 5px 0 0 0; color: #666;">Account Approved</p>
+        </div>
+
+        <p>Dear ${request.fullName},</p>
+
+        <div style="background-color: #d1fae5; border-left: 4px solid #10b981; padding: 16px; margin: 20px 0; border-radius: 4px;">
+          <h3 style="margin-top: 0; color: #065f46;">✅ Your Account Has Been Approved!</h3>
+          <p>Your account creation request has been approved successfully.</p>
+        </div>
+
+        <p><strong>Your Login Details:</strong></p>
+        <ul style="background-color: #f9fafb; padding: 16px; border-radius: 4px;">
+          <li><strong>Username:</strong> ${request.username}</li>
+          <li><strong>Email:</strong> ${request.email}</li>
+          <li><strong>Role:</strong> ${request.role || 'Clinic Owner'}</li>
+        </ul>
+
+        <p><strong>Next Steps:</strong></p>
+        <ol>
+          <li>Log in to the Health Prediction System using your username and password</li>
+          <li>Update your profile if needed</li>
+          <li>Start using the system to manage patient health predictions</li>
+        </ol>
+
+        <p style="text-align: center; margin: 30px 0;">
+          <a href="${clientUrl}/login" style="display: inline-block; background-color: #0d47a1; color: white; padding: 12px 30px; text-decoration: none; border-radius: 4px; font-weight: bold;">
+            Go to Login
+          </a>
+        </p>
+
+        <p style="color: #666; font-size: 14px; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+          If you have any questions or issues, please contact the system administrator.
+        </p>
+
+        <p style="color: #999; font-size: 12px;">
+          Thank you,<br />
+          Health Prediction System
+        </p>
+      </div>
+    `;
+
+    try {
+      logger.info('Sending email...');
+      const approvalResult = await sendMail({
+        to: request.email,
+        subject: '✅ Your Account Has Been Approved - Health Prediction System',
+        html: approvalEmailHtml,
+        text: `Dear ${request.fullName},\n\nYour account creation request has been approved successfully!\n\nUsername: ${request.username}\nEmail: ${request.email}\nRole: ${request.role || 'Clinic Owner'}\n\nYou can now log in to the system at ${clientUrl}/login\n\nThank you,\nHealth Prediction System`
+      });
+      if (approvalResult?.error) {
+        logger.error(`Failed to send approval email to ${request.email}: ${approvalResult.message}`);
+        logger.error('Email send error details:', approvalResult.detail || approvalResult);
+      } else {
+        logger.info('Email sent successfully');
+        logger.info(`Approval email sent successfully to ${request.email}`);
+      }
+    } catch (err) {
+      logger.error(`Failed to send approval email: ${err.message}`);
+    }
+
     logger.info(`Approved account request: ${request.username}`);
     res.json({ success: true, message: 'Account request approved successfully' });
   } catch (error) {
@@ -144,10 +209,17 @@ exports.approvePasswordResetRequest = async (req, res) => {
     request.status = 'Approved';
     request.approvedBy = req.admin?.username || 'Super Admin';
     request.approvedAt = new Date();
+
+    logger.info('Sending email...');
+    const emailResult = await sendPasswordReset(admin, otp);
+    if (emailResult?.error) {
+      logger.error(`Failed to send OTP email to ${admin.email}: ${emailResult.message}`);
+      logger.error('Email send error details:', emailResult.detail || emailResult);
+      return res.status(500).json({ success: false, message: 'Password reset approved, but OTP email failed to send.' });
+    }
+    logger.info('Email sent successfully');
+
     await request.save();
-
-    await sendPasswordReset(admin, otp);
-
     logger.info(`Approved password reset request: ${request.username}`);
     res.json({ success: true, message: `Password reset approved and OTP sent to ${admin.email}` });
   } catch (error) {
@@ -292,14 +364,24 @@ exports.approveFromEmail = async (req, res) => {
       </div>
     `;
 
-    // Send confirmation in the background so a slow/unreachable SMTP server
-    // doesn't delay the approval success page (the account is already created).
-    sendMail({
-      to: request.email,
-      subject: '✅ Your Account Has Been Approved - Health Prediction System',
-      html: approvalEmailHtml,
-      text: `Dear ${request.fullName},\n\nYour account creation request has been approved successfully!\n\nUsername: ${request.username}\nEmail: ${request.email}\nRole: ${request.role || 'Clinic Owner'}\n\nYou can now log in to the system at ${clientUrl}/login\n\nThank you,\nHealth Prediction System`
-    }).catch((err) => logger.error(`Failed to send approval email: ${err.message}`));
+    try {
+      logger.info('Sending email...');
+      const approvalResult = await sendMail({
+        to: request.email,
+        subject: '✅ Your Account Has Been Approved - Health Prediction System',
+        html: approvalEmailHtml,
+        text: `Dear ${request.fullName},\n\nYour account creation request has been approved successfully!\n\nUsername: ${request.username}\nEmail: ${request.email}\nRole: ${request.role || 'Clinic Owner'}\n\nYou can now log in to the system at ${clientUrl}/login\n\nThank you,\nHealth Prediction System`
+      });
+      if (approvalResult?.error) {
+        logger.error(`Failed to send approval email to ${request.email}: ${approvalResult.message}`);
+        logger.error('Email send error details:', approvalResult.detail || approvalResult);
+      } else {
+        logger.info('Email sent successfully');
+        logger.info(`Approval email sent successfully to ${request.email}`);
+      }
+    } catch (err) {
+      logger.error(`Failed to send approval email: ${err.message}`);
+    }
 
     logger.info(`Approved account request from email link: ${request.username}`);
 
