@@ -46,10 +46,8 @@
    | NODE_ENV | production |
    | MONGO_URI | mongodb+srv://ssanjay31431_db_user:KtqZrDb77VraZMXQ@cluster0.9mpfe4n.mongodb.net/health_prediction_db?retryWrites=true&w=majority |
    | JWT_SECRET | your-secret-key-change-in-production |
-   | EMAIL_USER | healthpredicts@gmail.com |
-   | EMAIL_PASS | fqetuglhnmphwcwq |
-   | GMAIL_EMAIL | healthpredicts@gmail.com |
-   | GMAIL_PASSWORD | fqetuglhnmphwcwq |
+| RESEND_API_KEY | your_resend_api_key |
+| RESEND_FROM_EMAIL | onboarding@resend.dev |
 
 6. Click **"Create Web Service"**
 

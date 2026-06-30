@@ -34,7 +34,7 @@ An AI-powered Health Prediction System built using the MERN Stack.
 - bcrypt
 
 ### Email
-- Nodemailer
+- Resend
 
 ### PDF
 - PDFKit
