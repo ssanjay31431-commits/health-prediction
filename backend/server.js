@@ -37,6 +37,7 @@ const allowedOrigins = [
 
 const normalizedOrigin = (origin) => (origin || '').trim();
 const isVercelOrigin = (origin) => /^https:\/\/[A-Za-z0-9-]+\.vercel\.app$/.test(origin);
+const isNetlifyOrigin = (origin) => /^https:\/\/([A-Za-z0-9-]+)\.netlify\.app$/.test(origin);
 
 const isOriginAllowed = (origin) => {
   const normalized = normalizedOrigin(origin);
@@ -44,6 +45,7 @@ const isOriginAllowed = (origin) => {
     !normalized ||
     allowedOrigins.includes(normalized) ||
     isVercelOrigin(normalized) ||
+    isNetlifyOrigin(normalized) ||
     process.env.ALLOW_ANY_ORIGIN === 'true'
   );
 };

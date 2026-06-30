@@ -1,0 +1,18 @@
+[build]
+  command = "cd frontend && npm install && npm run build"
+  publish = "frontend/dist"
+
+# Redirect API requests from Netlify to the backend service.
+# This should match your deployed backend URL.
+[[redirects]]
+  from = "/api/*"
+  to = "https://health-prediction-kl7y.onrender.com/api/:splat"
+  status = 200
+  force = true
+
+# SPA fallback so Netlify serves index.html for client-side routes.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+  force = true
