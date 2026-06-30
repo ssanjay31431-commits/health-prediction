@@ -2,17 +2,18 @@ const { Resend } = require('resend');
 const logger = require('../utils/logger');
 
 const {
-  SUPPORT_EMAIL,
   RESEND_API_KEY,
   RESEND_FROM_EMAIL,
-  RESEND_OWNER_EMAIL
+  SUPPORT_EMAIL: SUPPORT_EMAIL_ENV,
+  RESEND_OWNER_EMAIL: RESEND_OWNER_EMAIL_ENV
 } = process.env;
 
-const ownerEmail = RESEND_OWNER_EMAIL || SUPPORT_EMAIL;
+const SUPPORT_EMAIL = SUPPORT_EMAIL_ENV;
+const RESEND_OWNER_EMAIL = RESEND_OWNER_EMAIL_ENV;
+const adminRecipient = RESEND_OWNER_EMAIL || SUPPORT_EMAIL || 'ssanjay31431@gmail.com';
 const resendConfigured = Boolean(RESEND_API_KEY);
 const resendClient = resendConfigured ? new Resend(RESEND_API_KEY) : null;
 const resendFromAddress = RESEND_FROM_EMAIL || 'Health Prediction <onboarding@resend.dev>';
-const adminRecipientFallback = ownerEmail || SUPPORT_EMAIL || 'healthpredicts@gmail.com';
 
 if (!resendConfigured) {
   logger.warn('RESEND_API_KEY is not configured in backend/.env. Email delivery will fail until RESEND_API_KEY is provided.');
@@ -63,17 +64,21 @@ async function sendMail(mailOptions) {
   try {
     const response = await resendClient.emails.send(payload);
     // Log full response for observability and debugging
-    console.log('Email sent successfully');
     console.log('=== RESEND RESPONSE START ===');
     console.log(JSON.stringify(response, null, 2));
     console.log('=== RESEND RESPONSE END ===');
     if (response?.error) {
       console.error('RESEND ERROR:', response.error);
+      throw new Error(response.error.message || 'Resend returned an error');
     }
+    if (!response?.data?.id) {
+      throw new Error('Resend response missing data.id');
+    }
+    console.log('Email sent successfully:', response.data.id);
     if (response?.data) {
       console.log('RESEND DATA:', response.data);
     }
-    logger.info(`Email sent successfully to ${options.to} via Resend; response logged`);
+    logger.info(`Email sent successfully to ${options.to} via Resend; messageId=${response.data.id}`);
 
     return { ok: true, provider: 'resend', response };
   } catch (error) {
@@ -86,15 +91,24 @@ async function sendMail(mailOptions) {
     // If configured, retry sending to a verified owner address so admin notices can still arrive.
     try {
       const errMsg = (error?.message || error?.error?.message || error?.response?.data?.message || '').toString();
-      const owner = ownerEmail;
+      const owner = adminRecipient;
       const testModePattern = /test.*email|testing emails|verified.*email|own email address|only send .*testing emails/i;
 
       if (owner && testModePattern.test(errMsg) && owner !== options.to) {
-        logger.info(`Resend in test-mode: retrying delivery to configured owner email=${owner}`);
+        logger.warn(`Resend test-mode verification prevented delivery to ${options.to}; retrying to verified owner email=${owner}`);
         const retryPayload = { ...payload, to: owner };
         const retryResp = await resendClient.emails.send(retryPayload);
-        logger.info(`Retry email sent to owner ${owner}; respId=${retryResp?.id || retryResp?.messageId || null}`);
-        return { ok: true, provider: 'resend', retriedTo: owner, response: retryResp };
+        logger.info(`Retry email sent to owner ${owner}; respId=${retryResp?.id || retryResp?.messageId || retryResp?.data?.id || null}`);
+
+        return {
+          ok: false,
+          error: true,
+          message: `Original recipient ${options.to} is not verified for Resend test mode; email delivered to fallback owner ${owner}.`,
+          warning: 'Original recipient unverified in Resend test mode',
+          provider: 'resend',
+          retriedTo: owner,
+          response: retryResp
+        };
       }
 
       if (testModePattern.test(errMsg) && !owner) {
@@ -277,7 +291,6 @@ Health Prediction System`;
 
 async function sendAdminAccountRequestNotification(request) {
   console.log('=== sendAdminAccountRequestNotification CALLED ===');
-  const adminRecipient = adminRecipientFallback;
   console.log('Admin Recipient:', adminRecipient);
 
   const emailContent = buildAdminAccountRequestBody(request);
@@ -328,7 +341,8 @@ Health Prediction System`
 }
 
 async function sendAdminPasswordResetRequestNotification(admin) {
-  const adminRecipient = adminRecipientFallback;
+  console.log('=== sendAdminPasswordResetRequestNotification CALLED ===');
+  console.log('Admin Recipient:', adminRecipient);
   const emailContent = buildAdminPasswordResetRequestBody(admin);
 
   const options = {

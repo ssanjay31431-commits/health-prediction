@@ -85,7 +85,7 @@ exports.sendTestEmail = async (req, res, next) => {
 
 exports.sendTestEmailPublic = async (req, res, next) => {
   try {
-    const to = 'healthpredicts@gmail.com';
+    const to = process.env.RESEND_OWNER_EMAIL || process.env.SUPPORT_EMAIL || 'ssanjay31431@gmail.com';
     const from = process.env.RESEND_FROM_EMAIL || 'Health Prediction <onboarding@resend.dev>';
 
     const result = await sendMail({
