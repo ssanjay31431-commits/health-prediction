@@ -2,15 +2,24 @@ const { Resend } = require('resend');
 const logger = require('../utils/logger');
 
 const {
-  RESEND_API_KEY,
-  RESEND_FROM_EMAIL,
+  RESEND_API_KEY: RESEND_API_KEY_RAW,
+  RESEND_FROM_EMAIL: RESEND_FROM_EMAIL_RAW,
   SUPPORT_EMAIL: SUPPORT_EMAIL_ENV,
   RESEND_OWNER_EMAIL: RESEND_OWNER_EMAIL_ENV
 } = process.env;
 
-const SUPPORT_EMAIL = SUPPORT_EMAIL_ENV;
-const RESEND_OWNER_EMAIL = RESEND_OWNER_EMAIL_ENV;
+const RESEND_API_KEY = RESEND_API_KEY_RAW?.trim();
+const RESEND_FROM_EMAIL = RESEND_FROM_EMAIL_RAW?.trim();
+const SUPPORT_EMAIL = SUPPORT_EMAIL_ENV?.trim();
+const RESEND_OWNER_EMAIL = RESEND_OWNER_EMAIL_ENV?.trim();
 const adminRecipient = RESEND_OWNER_EMAIL || SUPPORT_EMAIL || 'ssanjay31431@gmail.com';
+
+logger.info(
+  `Resend configuration: apiKeyPresent=${Boolean(RESEND_API_KEY)}, ` +
+  `ownerEmailPresent=${Boolean(RESEND_OWNER_EMAIL)}, supportEmailPresent=${Boolean(SUPPORT_EMAIL)}, ` +
+  `adminRecipient=${adminRecipient}`
+);
+
 const resendConfigured = Boolean(RESEND_API_KEY);
 const resendClient = resendConfigured ? new Resend(RESEND_API_KEY) : null;
 const resendFromAddress = RESEND_FROM_EMAIL || 'Health Prediction <onboarding@resend.dev>';
