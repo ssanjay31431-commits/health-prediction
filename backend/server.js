@@ -32,14 +32,13 @@ app.use((req, res, next) => {
 const allowedOrigins = [
   'http://localhost:5173',
   'http://127.0.0.1:5173',
-  'https://healthpredict.netlify.app',
-  'https://health-prediction-kl7y.onrender.com',
   process.env.FRONTEND_URL,
 ].filter(Boolean);
 
 const normalizedOrigin = (origin) => (origin || '').trim();
 const isNetlifyOrigin = (origin) => /^https:\/\/[A-Za-z0-9-]+\.netlify\.app$/.test(origin);
 const isRenderOrigin = (origin) => /^https:\/\/[A-Za-z0-9-]+\.onrender\.com$/.test(origin);
+const isVercelOrigin = (origin) => /^https:\/\/[A-Za-z0-9-]+\.vercel\.app$/.test(origin);
 
 const isOriginAllowed = (origin) => {
   const normalized = normalizedOrigin(origin);
@@ -48,6 +47,7 @@ const isOriginAllowed = (origin) => {
     allowedOrigins.includes(normalized) ||
     isNetlifyOrigin(normalized) ||
     isRenderOrigin(normalized) ||
+    isVercelOrigin(normalized) ||
     process.env.ALLOW_ANY_ORIGIN === 'true'
   );
 };
@@ -89,6 +89,7 @@ app.use('/api/settings', settingRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 
 app.get('/', (req, res) => res.json({ status: 'ok' }));
+app.get('/api/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
 
 app.use(errorHandler);
 
