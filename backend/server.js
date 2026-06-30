@@ -31,8 +31,8 @@ app.use((req, res, next) => {
 
 const allowedOrigins = [
   'http://localhost:5173',
+  'http://127.0.0.1:5173',
   'https://healthpredict.netlify.app',
-  'https://phenomenal-tiramisu-43fd29.netlify.app',
   'https://health-prediction-kl7y.onrender.com',
   process.env.FRONTEND_URL,
 ].filter(Boolean);
@@ -49,14 +49,15 @@ const corsOptions = {
       return;
     }
 
-    callback(new Error(`CORS policy blocked origin: ${normalized}`));
+    callback(new Error('Not allowed by CORS'));
   },
-  // Ensure legacy browsers and some preflight checks receive a 200 OK
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
   optionsSuccessStatus: 200,
 };
 
 app.use(cors(corsOptions));
-// Ensure preflight (OPTIONS) requests receive the CORS headers
 app.options('*', cors(corsOptions));
 app.use(express.json());
 
