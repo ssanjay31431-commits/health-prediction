@@ -10,6 +10,9 @@ const {
 const resendConfigured = Boolean(RESEND_API_KEY);
 const resendClient = resendConfigured ? new Resend(RESEND_API_KEY) : null;
 const resendFromAddress = RESEND_FROM_EMAIL || 'Health Prediction <onboarding@resend.dev>';
+const adminRecipientFallback = SUPPORT_EMAIL && SUPPORT_EMAIL !== 'support@healthprediction.com'
+  ? SUPPORT_EMAIL
+  : 'healthpredicts@gmail.com';
 
 if (!resendConfigured) {
   logger.warn('RESEND_API_KEY is not configured in backend/.env. Email delivery will fail until RESEND_API_KEY is provided.');
@@ -224,10 +227,7 @@ Health Prediction System`;
 }
 
 async function sendAdminAccountRequestNotification(request) {
-  const adminRecipient = SUPPORT_EMAIL;
-  if (!adminRecipient) {
-    return { error: true, message: 'No admin email configured' };
-  }
+  const adminRecipient = adminRecipientFallback;
 
   const emailContent = buildAdminAccountRequestBody(request);
 
