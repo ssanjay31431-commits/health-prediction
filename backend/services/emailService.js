@@ -66,13 +66,13 @@ async function sendMail(mailOptions) {
     logger.error(`Resend delivery failed for ${options.to}: ${error && error.message}`, { error });
 
     // Special-case: Resend test-mode validation error prevents sending to arbitrary addresses.
-    // If configured, retry sending to a verified owner address (RESEND_OWNER_EMAIL) so admin notices arrive.
+    // If configured, retry sending to a verified owner address (RESEND_OWNER_EMAIL or SUPPORT_EMAIL) so admin notices arrive.
     try {
       const errMsg = error?.message || error?.error?.message || '';
-      if (/only send testing emails to your own email address\b/i.test(errMsg) && process.env.RESEND_OWNER_EMAIL) {
-        const owner = process.env.RESEND_OWNER_EMAIL;
+      const owner = process.env.RESEND_OWNER_EMAIL || SUPPORT_EMAIL;
+      if (/only send testing emails to your own email address/i.test(errMsg) && owner) {
         if (owner && owner !== options.to) {
-          logger.info(`Resend in test-mode: retrying delivery to configured RESEND_OWNER_EMAIL=${owner}`);
+          logger.info(`Resend in test-mode: retrying delivery to configured owner email=${owner}`);
           const retryPayload = { ...payload, to: owner };
           const retryResp = await resendClient.emails.send(retryPayload);
           logger.info(`Retry email sent to owner ${owner}; respId=${retryResp?.id || retryResp?.messageId || null}`);
