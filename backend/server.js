@@ -70,6 +70,28 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
+// Fallback headers: ensure preflight responses include CORS headers
+// This helps in environments where a proxy or host strips CORS headers.
+app.use((req, res, next) => {
+  try {
+    const origin = req.headers.origin || process.env.FRONTEND_URL || '';
+    if (process.env.ALLOW_ANY_ORIGIN === 'true') {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+    } else if (origin) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+    }
+
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
+    // expose credentials header when needed
+    if (process.env.ALLOW_CREDENTIALS === 'true') {
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+    }
+  } catch (err) {
+    logger.warn('Error setting fallback CORS headers', err);
+  }
+  next();
+});
 app.use(express.json());
 
 // Auth routes (public)
