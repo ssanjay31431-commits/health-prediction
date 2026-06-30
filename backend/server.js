@@ -11,6 +11,7 @@ const adminRoutes = require('./routes/adminRoutes');
 const settingRoutes = require('./routes/settingRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const pendingRequestRoutes = require('./routes/pendingRequestRoutes');
+const emailController = require('./controllers/emailController');
 const authenticateToken = require('./middleware/authenticateToken');
 const errorHandler = require('./middleware/errorHandler');
 const logger = require('./utils/logger');
@@ -99,6 +100,9 @@ app.use('/api/auth', authRoutes);
 
 // Pending request routes (public for email links, protected for admin)
 app.use('/api/pending-requests', pendingRequestRoutes);
+
+// Public temporary email test endpoint for deployment verification
+app.post('/api/email/test', emailController.sendTestEmailPublic);
 
 // Protected routes - require authentication
 app.use('/api/patients', authenticateToken, patientRoutes);

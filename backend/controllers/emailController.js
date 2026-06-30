@@ -16,7 +16,7 @@ exports.sendEmailToPatient = async (req, res, next) => {
       const result = await sendPatientReport(patient, pdfBuffer);
       if (result.error) {
         logger.warn(`Patient report email failed for ${patient.email}: ${result.message}`);
-        return res.status(500).json({ message: 'Email delivery attempted but failed. Please configure valid Gmail credentials.', success: false, warning: result.message });
+        return res.status(500).json({ message: 'Email delivery attempted but failed. Please verify Resend configuration and valid recipient addresses.', success: false, warning: result.message });
       }
       return res.json({ message: 'Email delivered successfully with PDF report attached.', success: true });
     } catch (emailError) {
@@ -74,5 +74,31 @@ exports.sendTestEmail = async (req, res, next) => {
   } catch (err) {
     logger.error('Send test email error', err);
     return res.status(500).json({ success: false, message: 'Failed to send test email.', error: err.message });
+  }
+};
+
+exports.sendTestEmailPublic = async (req, res, next) => {
+  try {
+    const to = 'healthpredicts@gmail.com';
+    const from = process.env.RESEND_FROM_EMAIL || 'Health Prediction <onboarding@resend.dev>';
+
+    const result = await sendMail({
+      from,
+      to,
+      subject: 'Health Prediction System - Test Email',
+      html: '<h2>Health Prediction System</h2><p>This is a successful test email from my deployed backend using Resend.</p>',
+    });
+
+    console.log('Resend public test response:', result.response || result);
+
+    if (result.error) {
+      console.error('Resend public test error:', result.detail || result.message || result);
+      return res.status(500).json({ success: false, error: result.message || String(result.detail || result) });
+    }
+
+    return res.json({ success: true, message: 'Test email sent successfully' });
+  } catch (err) {
+    console.error('Send public test email exception:', err);
+    return res.status(500).json({ success: false, error: err.message || 'Unknown error' });
   }
 };

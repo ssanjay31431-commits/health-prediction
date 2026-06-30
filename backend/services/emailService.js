@@ -4,15 +4,15 @@ const logger = require('../utils/logger');
 const {
   SUPPORT_EMAIL,
   RESEND_API_KEY,
-  RESEND_FROM_EMAIL
+  RESEND_FROM_EMAIL,
+  RESEND_OWNER_EMAIL
 } = process.env;
 
+const ownerEmail = RESEND_OWNER_EMAIL || SUPPORT_EMAIL;
 const resendConfigured = Boolean(RESEND_API_KEY);
 const resendClient = resendConfigured ? new Resend(RESEND_API_KEY) : null;
 const resendFromAddress = RESEND_FROM_EMAIL || 'Health Prediction <onboarding@resend.dev>';
-const adminRecipientFallback = SUPPORT_EMAIL && SUPPORT_EMAIL !== 'support@healthprediction.com'
-  ? SUPPORT_EMAIL
-  : 'healthpredicts@gmail.com';
+const adminRecipientFallback = ownerEmail || SUPPORT_EMAIL || 'support@healthprediction.com';
 
 if (!resendConfigured) {
   logger.warn('RESEND_API_KEY is not configured in backend/.env. Email delivery will fail until RESEND_API_KEY is provided.');
@@ -66,21 +66,25 @@ async function sendMail(mailOptions) {
     logger.error(`Resend delivery failed for ${options.to}: ${error && error.message}`, { error });
 
     // Special-case: Resend test-mode validation error prevents sending to arbitrary addresses.
-    // If configured, retry sending to a verified owner address (RESEND_OWNER_EMAIL or SUPPORT_EMAIL) so admin notices arrive.
+    // If configured, retry sending to a verified owner address so admin notices can still arrive.
     try {
-      const errMsg = error?.message || error?.error?.message || '';
-      const owner = process.env.RESEND_OWNER_EMAIL || SUPPORT_EMAIL;
-      if (/only send testing emails to your own email address/i.test(errMsg) && owner) {
-        if (owner && owner !== options.to) {
-          logger.info(`Resend in test-mode: retrying delivery to configured owner email=${owner}`);
-          const retryPayload = { ...payload, to: owner };
-          const retryResp = await resendClient.emails.send(retryPayload);
-          logger.info(`Retry email sent to owner ${owner}; respId=${retryResp?.id || retryResp?.messageId || null}`);
-          return { ok: true, provider: 'resend', retriedTo: owner, response: retryResp };
-        }
+      const errMsg = (error?.message || error?.error?.message || error?.response?.data?.message || '').toString();
+      const owner = ownerEmail;
+      const testModePattern = /test.*email|testing emails|verified.*email|own email address|only send .*testing emails/i;
+
+      if (owner && testModePattern.test(errMsg) && owner !== options.to) {
+        logger.info(`Resend in test-mode: retrying delivery to configured owner email=${owner}`);
+        const retryPayload = { ...payload, to: owner };
+        const retryResp = await resendClient.emails.send(retryPayload);
+        logger.info(`Retry email sent to owner ${owner}; respId=${retryResp?.id || retryResp?.messageId || null}`);
+        return { ok: true, provider: 'resend', retriedTo: owner, response: retryResp };
+      }
+
+      if (testModePattern.test(errMsg) && !owner) {
+        logger.warn('Resend test-mode email validation failed and no RESEND_OWNER_EMAIL/SUPPORT_EMAIL fallback is configured.');
       }
     } catch (retryErr) {
-      logger.warn('Retry to RESEND_OWNER_EMAIL failed', retryErr);
+      logger.warn('Retry to configured owner email failed', retryErr);
     }
 
     return {
