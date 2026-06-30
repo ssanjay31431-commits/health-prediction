@@ -41,15 +41,28 @@ const normalizedOrigin = (origin) => (origin || '').trim();
 const isNetlifyOrigin = (origin) => /^https:\/\/[A-Za-z0-9-]+\.netlify\.app$/.test(origin);
 const isRenderOrigin = (origin) => /^https:\/\/[A-Za-z0-9-]+\.onrender\.com$/.test(origin);
 
+const isOriginAllowed = (origin) => {
+  const normalized = normalizedOrigin(origin);
+  return (
+    !normalized ||
+    allowedOrigins.includes(normalized) ||
+    isNetlifyOrigin(normalized) ||
+    isRenderOrigin(normalized) ||
+    process.env.ALLOW_ANY_ORIGIN === 'true'
+  );
+};
+
 const corsOptions = {
   origin: (origin, callback) => {
-    const normalized = normalizedOrigin(origin);
-    if (!normalized || allowedOrigins.includes(normalized) || isNetlifyOrigin(normalized) || isRenderOrigin(normalized) || process.env.ALLOW_ANY_ORIGIN === 'true') {
+    if (isOriginAllowed(origin)) {
       callback(null, true);
       return;
     }
 
-    callback(new Error('Not allowed by CORS'));
+    // Reject without throwing so disallowed origins get a clean CORS block
+    // (missing Access-Control-Allow-Origin) instead of a 500 error.
+    logger.warn(`CORS: origin not allowed: ${normalizedOrigin(origin)}`);
+    callback(null, false);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
