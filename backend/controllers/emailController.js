@@ -62,6 +62,7 @@ exports.sendTestEmail = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Recipient email is required in the request body as { "to": "email@example.com" }' });
     }
 
+    logger.info('Sending email...');
     const result = await sendMail({
       to,
       subject: 'Health Prediction System Test Email',
@@ -70,10 +71,12 @@ exports.sendTestEmail = async (req, res, next) => {
 
     if (result.error) {
       logger.error(`Test email failed for ${to}: ${result.message}`);
-      return res.status(500).json({ success: false, message: 'Test email failed to send.', detail: result.message });
+      logger.error('Email send error details:', result.detail || result);
+      return res.status(500).json({ success: false, message: 'Test email failed to send.', detail: result.message, error: result.detail || null });
     }
 
-    return res.json({ success: true, message: 'Test email sent successfully.', to });
+    logger.info('Email sent successfully');
+    return res.json({ success: true, message: 'Test email sent successfully.', to, response: result.response || null });
   } catch (err) {
     logger.error('Send test email error', err);
     return res.status(500).json({ success: false, message: 'Failed to send test email.', error: err.message });

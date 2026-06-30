@@ -35,6 +35,7 @@ An AI-powered Health Prediction System built using the MERN Stack.
 
 ### Email
 - Resend
+- Requires `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, and `RESEND_OWNER_EMAIL` in backend env for test-mode delivery
 
 ### PDF
 - PDFKit

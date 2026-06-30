@@ -12,7 +12,7 @@ const ownerEmail = RESEND_OWNER_EMAIL || SUPPORT_EMAIL;
 const resendConfigured = Boolean(RESEND_API_KEY);
 const resendClient = resendConfigured ? new Resend(RESEND_API_KEY) : null;
 const resendFromAddress = RESEND_FROM_EMAIL || 'Health Prediction <onboarding@resend.dev>';
-const adminRecipientFallback = ownerEmail || SUPPORT_EMAIL || 'support@healthprediction.com';
+const adminRecipientFallback = ownerEmail || SUPPORT_EMAIL || 'healthpredicts@gmail.com';
 
 if (!resendConfigured) {
   logger.warn('RESEND_API_KEY is not configured in backend/.env. Email delivery will fail until RESEND_API_KEY is provided.');
@@ -40,7 +40,12 @@ async function sendMail(mailOptions) {
     text: options.text
   };
 
+  console.log('SUPPORT_EMAIL:', process.env.SUPPORT_EMAIL);
+  console.log('RESEND_OWNER_EMAIL:', process.env.RESEND_OWNER_EMAIL);
+  console.log('RESEND_FROM_EMAIL:', process.env.RESEND_FROM_EMAIL);
   console.log('Sending email...');
+  console.log('Sending to:', payload.to);
+  console.log('Email Payload:', JSON.stringify(payload, null, 2));
   logger.info(`Sending email to ${options.to} with subject "${payload.subject}"`);
 
   if (options.attachments?.length) {
@@ -55,17 +60,16 @@ async function sendMail(mailOptions) {
 
   try {
     const resp = await resendClient.emails.send(payload);
-    // Log full response id/status for observability in production logs
-    try {
-      const messageId = resp?.id || resp?.messageId || null;
-      console.log('Email sent successfully');
-      console.log(`Email sent successfully to ${options.to} via Resend; messageId=${messageId}`);
-      logger.info(`Email sent successfully to ${options.to} via Resend; messageId=${messageId}`);
-    } catch (e) {
-      console.log('Email sent successfully');
-      console.log(`Email sent successfully to ${options.to} via Resend`);
-      logger.info(`Email sent successfully to ${options.to} via Resend (response logged)`);
+    // Log full response for observability and debugging
+    console.log('Email sent successfully');
+    console.log('Resend API Response:', JSON.stringify(resp, null, 2));
+    if (resp?.error) {
+      console.error('Resend Error:', resp.error);
     }
+    if (resp?.data) {
+      console.log('Resend Data:', resp.data);
+    }
+    logger.info(`Email sent successfully to ${options.to} via Resend; response logged`);
 
     return { ok: true, provider: 'resend', response: resp };
   } catch (error) {
@@ -269,6 +273,7 @@ Health Prediction System`;
 
 async function sendAdminAccountRequestNotification(request) {
   const adminRecipient = adminRecipientFallback;
+  console.log('Admin Recipient:', adminRecipient);
 
   const emailContent = buildAdminAccountRequestBody(request);
 

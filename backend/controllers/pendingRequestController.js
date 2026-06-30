@@ -205,21 +205,28 @@ exports.approvePasswordResetRequest = async (req, res) => {
     }
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    request.otp = otp;
-    request.status = 'Approved';
-    request.approvedBy = req.admin?.username || 'Super Admin';
-    request.approvedAt = new Date();
+    admin.resetToken = otp;
+    admin.resetTokenExpiry = Date.now() + 30 * 60 * 1000;
+    await admin.save();
 
     logger.info('Sending email...');
     const emailResult = await sendPasswordReset(admin, otp);
     if (emailResult?.error) {
       logger.error(`Failed to send OTP email to ${admin.email}: ${emailResult.message}`);
       logger.error('Email send error details:', emailResult.detail || emailResult);
+      admin.resetToken = null;
+      admin.resetTokenExpiry = null;
+      await admin.save();
       return res.status(500).json({ success: false, message: 'Password reset approved, but OTP email failed to send.' });
     }
     logger.info('Email sent successfully');
 
+    request.otp = otp;
+    request.status = 'Approved';
+    request.approvedBy = req.admin?.username || 'Super Admin';
+    request.approvedAt = new Date();
     await request.save();
+
     logger.info(`Approved password reset request: ${request.username}`);
     res.json({ success: true, message: `Password reset approved and OTP sent to ${admin.email}` });
   } catch (error) {
