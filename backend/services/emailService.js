@@ -32,6 +32,7 @@ async function sendMail(mailOptions) {
     };
   }
 
+  console.log('=== sendMail() EXECUTED ===');
   const payload = {
     from: options.from,
     to: options.to,
@@ -40,12 +41,13 @@ async function sendMail(mailOptions) {
     text: options.text
   };
 
+  console.log('RESEND_API_KEY loaded:', !!process.env.RESEND_API_KEY);
+  console.log('RESEND_FROM_EMAIL:', process.env.RESEND_FROM_EMAIL);
   console.log('SUPPORT_EMAIL:', process.env.SUPPORT_EMAIL);
   console.log('RESEND_OWNER_EMAIL:', process.env.RESEND_OWNER_EMAIL);
-  console.log('RESEND_FROM_EMAIL:', process.env.RESEND_FROM_EMAIL);
   console.log('Sending email...');
-  console.log('Sending to:', payload.to);
-  console.log('Email Payload:', JSON.stringify(payload, null, 2));
+  console.log('=== Sending Payload ===');
+  console.log(JSON.stringify(payload, null, 2));
   logger.info(`Sending email to ${options.to} with subject "${payload.subject}"`);
 
   if (options.attachments?.length) {
@@ -59,19 +61,21 @@ async function sendMail(mailOptions) {
   }
 
   try {
-    const resp = await resendClient.emails.send(payload);
+    const response = await resendClient.emails.send(payload);
     // Log full response for observability and debugging
     console.log('Email sent successfully');
-    console.log('Resend API Response:', JSON.stringify(resp, null, 2));
-    if (resp?.error) {
-      console.error('Resend Error:', resp.error);
+    console.log('=== RESEND RESPONSE START ===');
+    console.log(JSON.stringify(response, null, 2));
+    console.log('=== RESEND RESPONSE END ===');
+    if (response?.error) {
+      console.error('RESEND ERROR:', response.error);
     }
-    if (resp?.data) {
-      console.log('Resend Data:', resp.data);
+    if (response?.data) {
+      console.log('RESEND DATA:', response.data);
     }
     logger.info(`Email sent successfully to ${options.to} via Resend; response logged`);
 
-    return { ok: true, provider: 'resend', response: resp };
+    return { ok: true, provider: 'resend', response };
   } catch (error) {
     // Log full error for debugging (may include HTTP response body)
     console.error(`Resend delivery failed for ${options.to}: ${error && error.message}`);
@@ -272,6 +276,7 @@ Health Prediction System`;
 }
 
 async function sendAdminAccountRequestNotification(request) {
+  console.log('=== sendAdminAccountRequestNotification CALLED ===');
   const adminRecipient = adminRecipientFallback;
   console.log('Admin Recipient:', adminRecipient);
 

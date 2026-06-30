@@ -15,6 +15,8 @@ const authenticateToken = require('./middleware/authenticateToken');
 const errorHandler = require('./middleware/errorHandler');
 const logger = require('./utils/logger');
 
+console.log('Backend version:', process.env.RENDER_GIT_COMMIT || 'unknown');
+
 const app = express();
 const PORT = Number(process.env.PORT) || 5000;
 const PORT_FROM_ENV = typeof process.env.PORT !== 'undefined';
