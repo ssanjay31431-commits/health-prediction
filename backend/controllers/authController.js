@@ -463,15 +463,19 @@ exports.requestAccountCreation = async (req, res) => {
 
     await pendingRequest.save();
 
-    // Send notification email to system admin
-    const emailResult = await sendAdminAccountRequestNotification(pendingRequest);
-
-    if (emailResult?.error) {
-      logger.error(`Failed to send account request email: ${emailResult.message}`);
-      // Don't fail the request even if email fails
-    }
-
     logger.info(`Account creation request submitted: ${username}`);
+
+    // Send notification email to system admin in the background so a slow or
+    // unreachable SMTP server never blocks the HTTP response.
+    sendAdminAccountRequestNotification(pendingRequest)
+      .then((emailResult) => {
+        if (emailResult?.error) {
+          logger.error(`Failed to send account request email: ${emailResult.message}`);
+        }
+      })
+      .catch((err) => {
+        logger.error(`Failed to send account request email: ${err.message}`);
+      });
 
     return res.status(201).json({
       success: true,
