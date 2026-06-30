@@ -1,5 +1,5 @@
 const repo = require('../services/patientRepo');
-const { sendPatientReport, sendBulkHighRiskAlerts } = require('../services/emailService');
+const { sendPatientReport, sendBulkHighRiskAlerts, sendMail } = require('../services/emailService');
 const { generatePatientReportPdf } = require('../services/pdfService');
 const logger = require('../utils/logger');
 
@@ -49,5 +49,30 @@ exports.sendEmailToAllHighRiskPatients = async (req, res, next) => {
     logger.error('Bulk high-risk email error', err);
     // Don't crash - return graceful response
     return res.json({ message: 'Email campaign completed with warnings.', success: true, warning: err.message });
+  }
+};
+
+exports.sendTestEmail = async (req, res, next) => {
+  try {
+    const { to } = req.body;
+    if (!to) {
+      return res.status(400).json({ success: false, message: 'Recipient email is required in the request body as { "to": "email@example.com" }' });
+    }
+
+    const result = await sendMail({
+      to,
+      subject: 'Health Prediction System Test Email',
+      text: `This is a test email sent from the Health Prediction System backend. If you received this, Resend delivery is working correctly for ${to}.`,
+    });
+
+    if (result.error) {
+      logger.error(`Test email failed for ${to}: ${result.message}`);
+      return res.status(500).json({ success: false, message: 'Test email failed to send.', detail: result.message });
+    }
+
+    return res.json({ success: true, message: 'Test email sent successfully.', to });
+  } catch (err) {
+    logger.error('Send test email error', err);
+    return res.status(500).json({ success: false, message: 'Failed to send test email.', error: err.message });
   }
 };
