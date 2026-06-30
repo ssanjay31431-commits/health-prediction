@@ -18,7 +18,12 @@ const transporterConfig = {
   },
   tls: {
     rejectUnauthorized: false
-  }
+  },
+  // Fail fast instead of hanging the request when SMTP is unreachable
+  // (e.g. outbound port 465 blocked on the host).
+  connectionTimeout: 10000,
+  greetingTimeout: 10000,
+  socketTimeout: 15000
 };
 
 const transporter = nodemailer.createTransport(transporterConfig);
