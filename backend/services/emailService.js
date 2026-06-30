@@ -1,52 +1,62 @@
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 const logger = require('../utils/logger');
 
-const { EMAIL_USER, EMAIL_PASS, SUPPORT_EMAIL } = process.env;
-const emailConfigured = Boolean(EMAIL_USER && EMAIL_PASS);
+const {
+  SUPPORT_EMAIL,
+  RESEND_API_KEY,
+  RESEND_FROM_EMAIL
+} = process.env;
 
-if (!emailConfigured) {
-  logger.warn('EMAIL_USER or EMAIL_PASS is not configured in backend/.env. Email delivery will fail until valid Gmail credentials are provided.');
+const resendConfigured = Boolean(RESEND_API_KEY);
+const resendClient = resendConfigured ? new Resend(RESEND_API_KEY) : null;
+const resendFromAddress = RESEND_FROM_EMAIL || 'Health Prediction <onboarding@resend.dev>';
+
+if (!resendConfigured) {
+  logger.warn('RESEND_API_KEY is not configured in backend/.env. Email delivery will fail until RESEND_API_KEY is provided.');
 }
 
-const transporterConfig = {
-  host: 'smtp.gmail.com',
-  port: 465,
-  secure: true,
-  auth: {
-    user: EMAIL_USER,
-    pass: EMAIL_PASS
-  },
-  tls: {
-    rejectUnauthorized: false
-  },
-  // Fail fast instead of hanging the request when SMTP is unreachable
-  // (e.g. outbound port 465 blocked on the host).
-  connectionTimeout: 10000,
-  greetingTimeout: 10000,
-  socketTimeout: 15000
-};
-
-const transporter = nodemailer.createTransport(transporterConfig);
-
 async function sendMail(mailOptions) {
-  if (!emailConfigured) {
-    logger.error('Email credentials are not configured in backend/.env. OTP email cannot be sent.');
-    return { error: true, message: 'Email credentials not configured' };
-  }
-
   const options = {
-    from: EMAIL_USER,
+    from: mailOptions.from || resendFromAddress,
     ...mailOptions
   };
 
+  if (!resendConfigured) {
+    logger.error('Resend is not configured. Email will not be delivered.');
+    return {
+      error: true,
+      message: 'Operation completed successfully, but email could not be delivered.'
+    };
+  }
+
+  const payload = {
+    from: options.from,
+    to: options.to,
+    subject: options.subject || 'No subject',
+    html: options.html,
+    text: options.text
+  };
+
+  if (options.attachments?.length) {
+    payload.attachments = options.attachments.map((attachment) => ({
+      name: attachment.filename || attachment.name,
+      type: attachment.contentType || attachment.type || 'application/octet-stream',
+      data: Buffer.isBuffer(attachment.content)
+        ? attachment.content.toString('base64')
+        : Buffer.from(attachment.content || '').toString('base64')
+    }));
+  }
+
   try {
-    const info = await transporter.sendMail(options);
-    logger.info(`Email sent to ${options.to}: ${info.messageId}`);
-    return info;
+    await resendClient.emails.send(payload);
+    logger.info(`Email sent to ${options.to} via Resend`);
+    return { ok: true, provider: 'resend' };
   } catch (error) {
-    logger.error(`Email delivery failed for ${options.to}: ${error.message}`);
-    logger.warn('EMAIL SETUP: To fix Gmail authentication, use an App Password instead of your regular password. See: https://support.google.com/accounts/answer/185833');
-    return { error: true, message: error.message };
+    logger.error(`Resend delivery failed for ${options.to}: ${error.message}`);
+    return {
+      error: true,
+      message: 'Operation completed successfully, but email could not be delivered.'
+    };
   }
 }
 
@@ -214,7 +224,7 @@ Health Prediction System`;
 }
 
 async function sendAdminAccountRequestNotification(request) {
-  const adminRecipient = SUPPORT_EMAIL || EMAIL_USER;
+  const adminRecipient = SUPPORT_EMAIL;
   if (!adminRecipient) {
     return { error: true, message: 'No admin email configured' };
   }
@@ -279,7 +289,6 @@ async function sendPatientReport(patient, pdfBuffer) {
   return sendMail({
     to: patient.email,
     subject: 'Your Health Prediction Report',
-    from: `Health Prediction System <${EMAIL_USER}>`,
     text: `Dear ${patient.name},\n\nThank you for using the Health Prediction System.\n\nYour health assessment has been completed successfully.\n\nPlease find your Health Prediction Report attached as a PDF.\n\nIf your result indicates High Risk, we strongly recommend consulting a qualified healthcare professional as soon as possible.\n\nThank you.\n\nHealth Prediction System`,
     html: htmlBody,
     attachments: [

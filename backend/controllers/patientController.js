@@ -44,7 +44,7 @@ const generatePatientReportPdf = (patient) => {
       const resultLabel = prediction.toLowerCase().includes('high') ? 'Positive' : 'Negative';
       const statusLabel = prediction.toLowerCase().includes('high') ? 'High Risk' : 'Normal';
       const website = process.env.FRONTEND_URL || 'Health Prediction System';
-      const supportEmail = process.env.SUPPORT_EMAIL || process.env.EMAIL_USER || 'support@healthprediction.com';
+      const supportEmail = process.env.SUPPORT_EMAIL || 'support@healthprediction.com';
 
       if (logoPath) {
         try {
