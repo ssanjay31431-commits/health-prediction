@@ -246,6 +246,7 @@ exports.approveFromEmail = async (req, res) => {
     await request.save();
 
     // Send approval confirmation email to user
+    const clientUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
     const approvalEmailHtml = `
       <div style="font-family: Arial, sans-serif; color: #1f2937; line-height: 1.6; max-width: 600px; margin: 0 auto;">
         <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
@@ -275,7 +276,7 @@ exports.approveFromEmail = async (req, res) => {
         </ol>
 
         <p style="text-align: center; margin: 30px 0;">
-          <a href="http://localhost:5173/login" style="display: inline-block; background-color: #0d47a1; color: white; padding: 12px 30px; text-decoration: none; border-radius: 4px; font-weight: bold;">
+          <a href="${clientUrl}/login" style="display: inline-block; background-color: #0d47a1; color: white; padding: 12px 30px; text-decoration: none; border-radius: 4px; font-weight: bold;">
             Go to Login
           </a>
         </p>
@@ -291,12 +292,14 @@ exports.approveFromEmail = async (req, res) => {
       </div>
     `;
 
-    await sendMail({
+    // Send confirmation in the background so a slow/unreachable SMTP server
+    // doesn't delay the approval success page (the account is already created).
+    sendMail({
       to: request.email,
       subject: '✅ Your Account Has Been Approved - Health Prediction System',
       html: approvalEmailHtml,
-      text: `Dear ${request.fullName},\n\nYour account creation request has been approved successfully!\n\nUsername: ${request.username}\nEmail: ${request.email}\nRole: ${request.role || 'Clinic Owner'}\n\nYou can now log in to the system at http://localhost:5173/login\n\nThank you,\nHealth Prediction System`
-    });
+      text: `Dear ${request.fullName},\n\nYour account creation request has been approved successfully!\n\nUsername: ${request.username}\nEmail: ${request.email}\nRole: ${request.role || 'Clinic Owner'}\n\nYou can now log in to the system at ${clientUrl}/login\n\nThank you,\nHealth Prediction System`
+    }).catch((err) => logger.error(`Failed to send approval email: ${err.message}`));
 
     logger.info(`Approved account request from email link: ${request.username}`);
 

@@ -149,7 +149,9 @@ async function sendAccountRequestNotification(request) {
 }
 
 function buildAdminAccountRequestBody(request) {
-  const backendUrl = process.env.BACKEND_URL || 'http://localhost:5000';
+  // On Render, RENDER_EXTERNAL_URL is injected automatically; fall back to it
+  // so the email approve/reject links point at the live backend, not localhost.
+  const backendUrl = process.env.BACKEND_URL || process.env.RENDER_EXTERNAL_URL || 'http://localhost:5000';
   const approveLink = `${backendUrl}/api/pending-requests/${request._id}/approve`;
   const rejectLink = `${backendUrl}/api/pending-requests/${request._id}/reject`;
 
