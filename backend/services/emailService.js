@@ -51,14 +51,23 @@ async function sendMail(mailOptions) {
   }
 
   try {
-    await resendClient.emails.send(payload);
-    logger.info(`Email sent to ${options.to} via Resend`);
-    return { ok: true, provider: 'resend' };
+    const resp = await resendClient.emails.send(payload);
+    // Log full response id/status for observability in production logs
+    try {
+      const messageId = resp?.id || resp?.messageId || null;
+      logger.info(`Email sent to ${options.to} via Resend; messageId=${messageId}`);
+    } catch (e) {
+      logger.info(`Email sent to ${options.to} via Resend (response logged)`);
+    }
+
+    return { ok: true, provider: 'resend', response: resp };
   } catch (error) {
-    logger.error(`Resend delivery failed for ${options.to}: ${error.message}`);
+    // Log full error for debugging (may include HTTP response body)
+    logger.error(`Resend delivery failed for ${options.to}: ${error && error.message}`, { error });
     return {
       error: true,
-      message: 'Operation completed successfully, but email could not be delivered.'
+      message: error?.message || 'Operation completed, but email could not be delivered.',
+      detail: error
     };
   }
 }
