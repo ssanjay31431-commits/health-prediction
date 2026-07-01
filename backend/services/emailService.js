@@ -14,6 +14,10 @@ const SUPPORT_EMAIL = SUPPORT_EMAIL_ENV?.trim();
 const RESEND_OWNER_EMAIL = RESEND_OWNER_EMAIL_ENV?.trim();
 const adminRecipient = RESEND_OWNER_EMAIL || SUPPORT_EMAIL || 'ssanjay31431@gmail.com';
 
+const resendFromAddress = RESEND_FROM_EMAIL || 'Health Prediction <onboarding@resend.dev>';
+const resendTestMode = resendFromAddress.toLowerCase().includes('onboarding@resend.dev');
+const resendTestModeWarning = 'Resend is running in test mode. Emails can only be delivered to the verified owner email. Patient emails will not be delivered until a custom domain is verified.';
+
 function formatKeyPrefix(key) {
   if (!key || typeof key !== 'string') return 'N/A';
   const prefix = key.startsWith('re_') ? key.slice(0, 7) : key.slice(0, 4);
@@ -27,6 +31,8 @@ console.log('================================');
 console.log('Resend Configuration');
 console.log(`RESEND_API_KEY Loaded: ${resendApiKeyLoaded ? 'YES' : 'NO'}`);
 console.log(`Key Prefix: ${resendApiKeyLoaded ? formatKeyPrefix(RESEND_API_KEY) : 'N/A'}`);
+console.log(`RESEND_FROM_EMAIL: ${resendFromAddress}`);
+console.log(`Resend Test Mode: ${resendTestMode ? 'YES' : 'NO'}`);
 console.log('================================');
 
 if (!resendApiKeyValid) {
@@ -35,7 +41,13 @@ if (!resendApiKeyValid) {
 
 const resendConfigured = true;
 const resendClient = new Resend(RESEND_API_KEY);
-const resendFromAddress = RESEND_FROM_EMAIL || 'Health Prediction <onboarding@resend.dev>';
+
+function isVerifiedOwnerRecipient(email) {
+  if (!email) return false;
+  const normalizedRecipient = email.toString().trim().toLowerCase();
+  const normalizedOwner = (adminRecipient || '').toString().trim().toLowerCase();
+  return normalizedOwner && normalizedRecipient === normalizedOwner;
+}
 
 async function sendMail(mailOptions) {
   const options = {
@@ -59,6 +71,54 @@ async function sendMail(mailOptions) {
     html: options.html,
     text: options.text
   };
+
+  const isOwnerRecipient = isVerifiedOwnerRecipient(options.to);
+  if (resendTestMode) {
+    logger.warn(resendTestModeWarning);
+    console.warn(resendTestModeWarning);
+  }
+
+  if (resendTestMode && !isOwnerRecipient) {
+    const owner = adminRecipient;
+    logger.warn(`Resend test mode is active and recipient ${options.to} is not the verified owner. Redirecting delivery to verified owner ${owner || 'NONE'}.`);
+
+    if (owner) {
+      const fallbackPayload = { ...payload, to: owner };
+      try {
+        const fallbackResponse = await resendClient.emails.send(fallbackPayload);
+        logger.info(`Fallback email sent to verified owner ${owner} during Resend test mode. Recipient ${options.to} was not verified.`);
+        console.log('=== RESEND FALLBACK RESPONSE START ===');
+        console.log(JSON.stringify(fallbackResponse, null, 2));
+        console.log('=== RESEND FALLBACK RESPONSE END ===');
+
+        return {
+          ok: false,
+          error: true,
+          message: `Resend test mode blocked delivery to ${options.to}. Email was sent instead to verified owner ${owner} for admin visibility. Patient delivery is blocked until a verified custom domain is configured.`,
+          warning: resendTestModeWarning,
+          provider: 'resend',
+          retriedTo: owner,
+          response: fallbackResponse
+        };
+      } catch (fallbackErr) {
+        logger.error(`Fallback delivery to owner ${owner} also failed during Resend test mode: ${fallbackErr?.message}`);
+        logger.error('Fallback payload:', fallbackPayload);
+        return {
+          error: true,
+          message: `Resend test mode blocked delivery to ${options.to}, and fallback delivery to owner ${owner} also failed.`,
+          warning: resendTestModeWarning,
+          detail: fallbackErr
+        };
+      }
+    }
+
+    return {
+      error: true,
+      message: `Resend test mode blocked delivery to ${options.to}. Patient delivery is blocked until a verified custom domain is configured.`,
+      warning: resendTestModeWarning,
+      provider: 'resend'
+    };
+  }
 
   console.log('Recipient:', options.to);
   console.log('From Address:', options.from);
@@ -110,7 +170,7 @@ async function sendMail(mailOptions) {
       const owner = adminRecipient;
       const testModePattern = /test.*email|testing emails|verified.*email|own email address|only send .*testing emails/i;
 
-      if (owner && testModePattern.test(errMsg) && owner !== options.to) {
+      if (owner && owner !== options.to && (testModePattern.test(errMsg) || resendTestMode)) {
         logger.warn(`Resend test-mode verification prevented delivery to ${options.to}; retrying to verified owner email=${owner}`);
         const retryPayload = { ...payload, to: owner };
         const retryResp = await resendClient.emails.send(retryPayload);
@@ -119,8 +179,8 @@ async function sendMail(mailOptions) {
         return {
           ok: false,
           error: true,
-          message: `Original recipient ${options.to} is not verified for Resend test mode; email delivered to fallback owner ${owner}.`,
-          warning: 'Original recipient unverified in Resend test mode',
+          message: `Resend test mode blocked delivery to ${options.to}. Email was instead sent to verified owner ${owner} for admin visibility. Patient delivery was not successful until a verified custom domain is configured.`,
+          warning: resendTestModeWarning,
           provider: 'resend',
           retriedTo: owner,
           response: retryResp
