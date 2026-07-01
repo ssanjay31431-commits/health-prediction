@@ -69,7 +69,7 @@ async function sendMail(mailOptions) {
     payload.attachments = options.attachments.map((attachment) => ({
       name: attachment.filename || attachment.name,
       type: attachment.contentType || attachment.type || 'application/pdf',
-      data: Buffer.isBuffer(attachment.content)
+      content: Buffer.isBuffer(attachment.content)
         ? attachment.content.toString('base64')
         : Buffer.from(attachment.content || '').toString('base64')
     }));
