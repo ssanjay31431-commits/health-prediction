@@ -42,13 +42,6 @@ if (!resendApiKeyValid) {
 const resendConfigured = true;
 const resendClient = new Resend(RESEND_API_KEY);
 
-function isVerifiedOwnerRecipient(email) {
-  if (!email) return false;
-  const normalizedRecipient = email.toString().trim().toLowerCase();
-  const normalizedOwner = (adminRecipient || '').toString().trim().toLowerCase();
-  return normalizedOwner && normalizedRecipient === normalizedOwner;
-}
-
 async function sendMail(mailOptions) {
   const options = {
     from: mailOptions.from || resendFromAddress,
@@ -72,52 +65,19 @@ async function sendMail(mailOptions) {
     text: options.text
   };
 
-  const isOwnerRecipient = isVerifiedOwnerRecipient(options.to);
+  if (options.attachments?.length) {
+    payload.attachments = options.attachments.map((attachment) => ({
+      name: attachment.filename || attachment.name,
+      type: attachment.contentType || attachment.type || 'application/pdf',
+      data: Buffer.isBuffer(attachment.content)
+        ? attachment.content.toString('base64')
+        : Buffer.from(attachment.content || '').toString('base64')
+    }));
+  }
+
   if (resendTestMode) {
     logger.warn(resendTestModeWarning);
     console.warn(resendTestModeWarning);
-  }
-
-  if (resendTestMode && !isOwnerRecipient) {
-    const owner = adminRecipient;
-    logger.warn(`Resend test mode is active and recipient ${options.to} is not the verified owner. Redirecting delivery to verified owner ${owner || 'NONE'}.`);
-
-    if (owner) {
-      const fallbackPayload = { ...payload, to: owner };
-      try {
-        const fallbackResponse = await resendClient.emails.send(fallbackPayload);
-        logger.info(`Fallback email sent to verified owner ${owner} during Resend test mode. Recipient ${options.to} was not verified.`);
-        console.log('=== RESEND FALLBACK RESPONSE START ===');
-        console.log(JSON.stringify(fallbackResponse, null, 2));
-        console.log('=== RESEND FALLBACK RESPONSE END ===');
-
-        return {
-          ok: false,
-          error: true,
-          message: `Resend test mode blocked delivery to ${options.to}. Email was sent instead to verified owner ${owner} for admin visibility. Patient delivery is blocked until a verified custom domain is configured.`,
-          warning: resendTestModeWarning,
-          provider: 'resend',
-          retriedTo: owner,
-          response: fallbackResponse
-        };
-      } catch (fallbackErr) {
-        logger.error(`Fallback delivery to owner ${owner} also failed during Resend test mode: ${fallbackErr?.message}`);
-        logger.error('Fallback payload:', fallbackPayload);
-        return {
-          error: true,
-          message: `Resend test mode blocked delivery to ${options.to}, and fallback delivery to owner ${owner} also failed.`,
-          warning: resendTestModeWarning,
-          detail: fallbackErr
-        };
-      }
-    }
-
-    return {
-      error: true,
-      message: `Resend test mode blocked delivery to ${options.to}. Patient delivery is blocked until a verified custom domain is configured.`,
-      warning: resendTestModeWarning,
-      provider: 'resend'
-    };
   }
 
   console.log('Recipient:', options.to);
@@ -127,14 +87,11 @@ async function sendMail(mailOptions) {
   console.log(JSON.stringify(payload, null, 2));
   logger.info(`Sending email to ${options.to} with subject "${payload.subject}"`);
 
-  if (options.attachments?.length) {
-    payload.attachments = options.attachments.map((attachment) => ({
-      name: attachment.filename || attachment.name,
-      type: attachment.contentType || attachment.type || 'application/octet-stream',
-      data: Buffer.isBuffer(attachment.content)
-        ? attachment.content.toString('base64')
-        : Buffer.from(attachment.content || '').toString('base64')
-    }));
+  console.log('FINAL EMAIL PAYLOAD');
+  console.log(JSON.stringify(payload, null, 2));
+  if (payload.attachments?.length) {
+    console.log('FINAL ATTACHMENTS PAYLOAD');
+    console.log(JSON.stringify(payload.attachments, null, 2));
   }
 
   try {
@@ -163,35 +120,15 @@ async function sendMail(mailOptions) {
     logger.error(`Resend delivery failed for ${options.to}: ${error && error.message}`, { error });
     logger.error('Resend payload:', payload);
 
-    // Special-case: Resend test-mode validation error prevents sending to arbitrary addresses.
-    // If configured, retry sending to a verified owner address so admin notices can still arrive.
     try {
       const errMsg = (error?.message || error?.error?.message || error?.response?.data?.message || '').toString();
-      const owner = adminRecipient;
       const testModePattern = /test.*email|testing emails|verified.*email|own email address|only send .*testing emails/i;
 
-      if (owner && owner !== options.to && (testModePattern.test(errMsg) || resendTestMode)) {
-        logger.warn(`Resend test-mode verification prevented delivery to ${options.to}; retrying to verified owner email=${owner}`);
-        const retryPayload = { ...payload, to: owner };
-        const retryResp = await resendClient.emails.send(retryPayload);
-        logger.info(`Retry email sent to owner ${owner}; respId=${retryResp?.id || retryResp?.messageId || retryResp?.data?.id || null}`);
-
-        return {
-          ok: false,
-          error: true,
-          message: `Resend test mode blocked delivery to ${options.to}. Email was instead sent to verified owner ${owner} for admin visibility. Patient delivery was not successful until a verified custom domain is configured.`,
-          warning: resendTestModeWarning,
-          provider: 'resend',
-          retriedTo: owner,
-          response: retryResp
-        };
-      }
-
-      if (testModePattern.test(errMsg) && !owner) {
-        logger.warn('Resend test-mode email validation failed and no RESEND_OWNER_EMAIL/SUPPORT_EMAIL fallback is configured.');
+      if (testModePattern.test(errMsg)) {
+        logger.warn(`Resend test-mode verification prevented delivery to ${options.to}. No recipient override will occur.`);
       }
     } catch (retryErr) {
-      logger.warn('Retry to configured owner email failed', retryErr);
+      logger.warn('Error while handling resend failure:', retryErr);
     }
 
     return {
@@ -450,6 +387,13 @@ async function sendPatientNotification(patient) {
     throw new Error('Patient email not available');
   }
 
+  console.log('===== PATIENT EMAIL =====');
+  console.log('Patient Email:', patient.email);
+  console.log('Payload To:', patient.email);
+  console.log('PDF Attached:', false);
+  console.log('Attachment Count:', 0);
+  console.log('=========================');
+
   return sendMail({
     to: patient.email,
     subject: 'Health Prediction Report',
@@ -461,6 +405,19 @@ async function sendPatientReport(patient, pdfBuffer) {
   if (!patient || !patient.email) {
     throw new Error('Patient email not available');
   }
+
+  console.log('sendPatientReport patient.email:', patient.email);
+  console.log('PDF Buffer Size:', pdfBuffer?.length);
+  if (!pdfBuffer || !pdfBuffer.length) {
+    throw new Error('PDF Buffer is invalid or empty. Aborting patient email delivery.');
+  }
+
+  console.log('===== PATIENT EMAIL =====');
+  console.log('Patient Email:', patient.email);
+  console.log('Payload To:', patient.email);
+  console.log('PDF Attached:', true);
+  console.log('Attachment Count:', 1);
+  console.log('=========================');
 
   const filename = `Health_Report_${(patient.name || 'Patient').replace(/\s+/g, '_')}.pdf`;
   const htmlBody = `
@@ -495,6 +452,13 @@ async function sendHighRiskAlert(patient) {
   if (!patient || !patient.email) {
     throw new Error('Patient email not available');
   }
+
+  console.log('===== PATIENT EMAIL =====');
+  console.log('Patient Email:', patient.email);
+  console.log('Payload To:', patient.email);
+  console.log('PDF Attached:', false);
+  console.log('Attachment Count:', 0);
+  console.log('=========================');
 
   return sendMail({
     to: patient.email,

@@ -13,6 +13,8 @@ exports.sendEmailToPatient = async (req, res, next) => {
 
     try {
       const pdfBuffer = await generatePatientReportPdf(patient);
+      console.log('Patient email in emailController.sendEmailToPatient:', patient.email);
+      console.log('PDF Buffer Length:', pdfBuffer?.length);
       logger.info('Sending email...');
       const result = await sendPatientReport(patient, pdfBuffer);
       if (result.error) {

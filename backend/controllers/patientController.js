@@ -182,6 +182,7 @@ exports.createPatient = async (req, res, next) => {
 
     try {
       const pdfBuffer = await generatePatientReportPdf(patient);
+      console.log('PDF Buffer Length:', pdfBuffer?.length);
       logger.info('Sending email...');
       const emailResult = await sendPatientReport(patient, pdfBuffer);
       if (emailResult?.error) {
