@@ -9,11 +9,20 @@ if (fs.existsSync(envFilePath)) {
 
 const aliases = {
   MONGO_URI: ['MONGO_URI', 'MONGODB_URI', 'DATABASE_URL'],
-  BREVO_API_KEY: ['BREVO_API_KEY'],
-  BREVO_FROM_EMAIL: ['BREVO_FROM_EMAIL'],
-  RESEND_API_KEY: ['RESEND_API_KEY'],
-  RESEND_FROM_EMAIL: ['RESEND_FROM_EMAIL']
 };
+
+const requiredKeys = [
+  'MONGO_URI',
+  'JWT_SECRET',
+  'RESEND_API_KEY',
+  'RESEND_FROM_EMAIL',
+  'SUPPORT_EMAIL'
+];
+
+const optionalKeys = [
+  'BREVO_API_KEY',
+  'BREVO_FROM_EMAIL'
+];
 
 const getEnv = (keys) => keys
   .map((name) => process.env[name]?.trim())
@@ -21,35 +30,24 @@ const getEnv = (keys) => keys
 
 const envValues = {
   MONGO_URI: getEnv(aliases.MONGO_URI),
-  BREVO_API_KEY: getEnv(aliases.BREVO_API_KEY),
-  BREVO_FROM_EMAIL: getEnv(aliases.BREVO_FROM_EMAIL),
-  RESEND_API_KEY: getEnv(aliases.RESEND_API_KEY),
-  RESEND_FROM_EMAIL: getEnv(aliases.RESEND_FROM_EMAIL)
+  JWT_SECRET: process.env.JWT_SECRET?.trim(),
+  RESEND_API_KEY: process.env.RESEND_API_KEY?.trim(),
+  RESEND_FROM_EMAIL: process.env.RESEND_FROM_EMAIL?.trim(),
+  SUPPORT_EMAIL: process.env.SUPPORT_EMAIL?.trim(),
+  BREVO_API_KEY: process.env.BREVO_API_KEY?.trim(),
+  BREVO_FROM_EMAIL: process.env.BREVO_FROM_EMAIL?.trim()
 };
 
-const missingVars = Object.keys(envValues).filter((key) => !envValues[key]);
-
-console.log('===== EMAIL CONFIG =====');
-Object.entries(envValues).forEach(([key, value]) => {
-  if (value) {
-    if (key.endsWith('_FROM_EMAIL')) {
-      console.log(`${key}: ${value}`);
-    } else {
-      console.log(`${key}: Loaded`);
-    }
-  } else {
-    console.log(`✗ ${key} Missing`);
-  }
-});
-
-if (missingVars.length > 0) {
-  console.error(`Missing required environment variables: ${missingVars.join(', ')}`);
-}
-console.log('========================');
+const missingRequired = requiredKeys.filter((key) => !envValues[key]);
+const missingOptional = optionalKeys.filter((key) => !envValues[key]);
+const isBrevoEnabled = Boolean(envValues.BREVO_API_KEY && envValues.BREVO_FROM_EMAIL);
+const isResendEnabled = Boolean(envValues.RESEND_API_KEY && envValues.RESEND_FROM_EMAIL);
 
 module.exports = {
-  missingVars,
-  isEnvValid: missingVars.length === 0,
-  env: process.env,
+  envValues,
+  missingRequired,
+  missingOptional,
+  isBrevoEnabled,
+  isResendEnabled,
   mongoUri: envValues.MONGO_URI
 };

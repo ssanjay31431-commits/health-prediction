@@ -4,6 +4,59 @@ const envConfig = require('./config/env');
 const express = require('express');
 const cors = require('cors');
 const connectDB = require('./config/db');
+const logger = require('./utils/logger');
+
+console.log('Backend version:', process.env.RENDER_GIT_COMMIT || 'unknown');
+
+const app = express();
+const PORT = Number(process.env.PORT) || 5000;
+const PORT_FROM_ENV = typeof process.env.PORT !== 'undefined';
+
+const requiredKeys = [
+  'MONGO_URI',
+  'JWT_SECRET',
+  'RESEND_API_KEY',
+  'RESEND_FROM_EMAIL',
+  'SUPPORT_EMAIL'
+];
+const optionalKeys = [
+  'BREVO_API_KEY',
+  'BREVO_FROM_EMAIL'
+];
+
+const reportLines = ['=================================', 'Environment Variable Check', '================================='];
+requiredKeys.forEach((key) => {
+  const value = envConfig.envValues[key];
+  reportLines.push(value ? `✓ ${key}` : `✗ ${key}`);
+});
+optionalKeys.forEach((key) => {
+  const value = envConfig.envValues[key];
+  reportLines.push(value ? `✓ ${key} (optional)` : `✗ ${key} (optional)`);
+});
+reportLines.push('=================================');
+console.log(reportLines.join('\n'));
+
+const missingRequired = envConfig.missingRequired;
+const missingOptional = envConfig.missingOptional;
+const brevoEnabled = envConfig.isBrevoEnabled;
+const resendOk = envConfig.isResendEnabled;
+
+console.log(`MongoDB: ${envConfig.envValues.MONGO_URI ? 'OK' : 'Missing'}`);
+console.log(`Resend: ${resendOk ? 'OK' : 'Missing'}`);
+console.log(`Brevo: ${brevoEnabled ? 'Enabled' : 'Disabled'}`);
+
+if (missingRequired.length > 0) {
+  missingRequired.forEach((key) => console.error(`Missing required environment variable: ${key}`));
+  process.exit(1);
+}
+
+if (!brevoEnabled && missingOptional.length > 0) {
+  console.log('Brevo is disabled. Using Resend only.');
+}
+
+app.use(cors());
+app.use(express.json());
+
 const patientRoutes = require('./routes/patientRoutes');
 const predictRoutes = require('./routes/predictRoutes');
 const authRoutes = require('./routes/authRoutes');
@@ -13,22 +66,6 @@ const settingRoutes = require('./routes/settingRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const pendingRequestRoutes = require('./routes/pendingRequestRoutes');
 const authenticateToken = require('./middleware/authenticateToken');
-const errorHandler = require('./middleware/errorHandler');
-const logger = require('./utils/logger');
-
-console.log('Backend version:', process.env.RENDER_GIT_COMMIT || 'unknown');
-
-const app = express();
-const PORT = Number(process.env.PORT) || 5000;
-const PORT_FROM_ENV = typeof process.env.PORT !== 'undefined';
-
-if (!envConfig.isEnvValid) {
-  console.error('Server startup aborted due to missing required environment variables.');
-  process.exit(1);
-}
-
-app.use(cors());
-app.use(express.json());
 
 // Auth routes (public)
 app.use('/api/auth', authRoutes);
