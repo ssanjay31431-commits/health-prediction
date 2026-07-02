@@ -5,12 +5,13 @@ const express = require('express');
 const cors = require('cors');
 const connectDB = require('./config/db');
 const logger = require('./utils/logger');
+const errorHandler = require('./middleware/errorHandler');
 
 console.log('Backend version:', process.env.RENDER_GIT_COMMIT || 'unknown');
 
 const app = express();
 const PORT = Number(process.env.PORT) || 5000;
-const PORT_FROM_ENV = typeof process.env.PORT !== 'undefined';
+const PORT_FAIL_FAST = typeof process.env.PORT !== 'undefined' && process.env.PORT !== '';
 
 const requiredKeys = [
   'MONGO_URI',
@@ -92,8 +93,8 @@ const start = async () => {
     if (dbStatus?.error) logger.warn(dbStatus.error.message || dbStatus.error);
   }
 
-  // Attempt to listen on PORT. If PORT was explicitly set via env, fail-fast on EADDRINUSE.
-  const maxRetries = PORT_FROM_ENV ? 1 : 10;
+  // Attempt to listen on PORT. Fail fast only when Render explicitly defines PORT.
+  const maxRetries = PORT_FAIL_FAST ? 1 : 10;
   let attempt = 0;
   let currentPort = PORT;
 
@@ -107,7 +108,7 @@ const start = async () => {
 
     server.on('error', (err) => {
       if (err && err.code === 'EADDRINUSE') {
-        if (PORT_FROM_ENV) {
+        if (PORT_FAIL_FAST) {
           logger.error(`Port ${currentPort} is already in use. Stop the process using it or set a different PORT environment variable.`);
           process.exit(1);
         }
