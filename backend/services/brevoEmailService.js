@@ -1,5 +1,3 @@
-const path = require('path');
-require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 const SibApiV3Sdk = require('sib-api-v3-sdk');
 const logger = require('../utils/logger');
 

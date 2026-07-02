@@ -1,8 +1,7 @@
 const PendingRequest = require('../models/PendingRequest');
 const Admin = require('../models/Admin');
 const logger = require('../utils/logger');
-const { sendForgotPasswordOTP } = require('../services/brevoEmailService');
-const { sendMail } = require('../services/resendEmailService');
+const { sendForgotPasswordOTP, sendMail } = require('../services/resendEmailService');
 
 const expireStalePendingRequests = async () => {
   const now = new Date();

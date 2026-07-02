@@ -153,7 +153,54 @@ async function sendAdminAccountRequestNotification(request) {
   return sendMail(options);
 }
 
+function buildForgotPasswordText(admin) {
+  return `🏥 Health Prediction System
+
+Hello ${admin.fullName || admin.username},
+
+Your password reset OTP is: ${admin.resetToken || 'N/A'}
+
+This code expires in 30 minutes.
+
+If you did not request this, please ignore this email.
+
+Thank you,
+Health Prediction System`;
+}
+
+function buildForgotPasswordHtml(admin) {
+  return `
+    <div style="font-family: Arial, sans-serif; color: #1f2937; line-height: 1.6; max-width: 600px; margin: 0 auto;">
+      <div style="background-color: #eff6ff; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+        <h2 style="margin: 0; color: #1d4ed8;">🔐 Password Reset OTP</h2>
+      </div>
+      <p>Hello <strong>${admin.fullName || admin.username}</strong>,</p>
+      <p>Your password reset OTP is:</p>
+      <p style="font-size: 22px; font-weight: bold; letter-spacing: 2px; background: #f8fafc; padding: 14px; border-radius: 8px; display: inline-block;">${admin.resetToken || 'N/A'}</p>
+      <p style="margin-top: 18px;">This code expires in 30 minutes.</p>
+      <p>If you did not request this, please ignore this email.</p>
+      <p style="margin-top: 18px;">Thank you,<br />Health Prediction System</p>
+    </div>
+  `;
+}
+
+async function sendForgotPasswordOTP(admin) {
+  if (!admin || !admin.email) {
+    return { error: true, message: 'Admin email is required to send password reset OTP.' };
+  }
+
+  const options = {
+    to: admin.email,
+    subject: 'Your Password Reset OTP',
+    text: buildForgotPasswordText(admin),
+    html: buildForgotPasswordHtml(admin)
+  };
+
+  return sendMail(options);
+}
+
 module.exports = {
   sendMail,
-  sendAdminAccountRequestNotification
+  sendAdminAccountRequestNotification,
+  sendForgotPasswordOTP
 };

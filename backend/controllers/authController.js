@@ -1,8 +1,8 @@
 const Admin = require('../models/Admin');
 const jwt = require('jsonwebtoken');
 const logger = require('../utils/logger');
-const { sendPasswordResetSuccess, sendForgotPasswordOTP } = require('../services/brevoEmailService');
-const { sendAdminPasswordResetRequestNotification, sendAdminAccountRequestNotification } = require('../services/resendEmailService');
+const { sendPasswordResetSuccess } = require('../services/brevoEmailService');
+const { sendForgotPasswordOTP, sendAdminPasswordResetRequestNotification, sendAdminAccountRequestNotification } = require('../services/resendEmailService');
 
 const SUPER_ADMIN_USERNAME = process.env.SUPER_ADMIN_USERNAME || 'PAVI';
 const SUPER_ADMIN_PASSWORD = process.env.SUPER_ADMIN_PASSWORD || 'Pavi@123';

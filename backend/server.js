@@ -1,9 +1,9 @@
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
+const envConfig = require('./config/env');
 const express = require('express');
 const cors = require('cors');
 const connectDB = require('./config/db');
-const emailService = require('./services/emailService');
 const patientRoutes = require('./routes/patientRoutes');
 const predictRoutes = require('./routes/predictRoutes');
 const authRoutes = require('./routes/authRoutes');
@@ -21,6 +21,11 @@ console.log('Backend version:', process.env.RENDER_GIT_COMMIT || 'unknown');
 const app = express();
 const PORT = Number(process.env.PORT) || 5000;
 const PORT_FROM_ENV = typeof process.env.PORT !== 'undefined';
+
+if (!envConfig.isEnvValid) {
+  console.error('Server startup aborted due to missing required environment variables.');
+  process.exit(1);
+}
 
 app.use(cors());
 app.use(express.json());
