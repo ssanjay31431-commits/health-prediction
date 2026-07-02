@@ -49,7 +49,7 @@ app.get('/', (req, res) => res.json({ status: 'ok' }));
 app.use(errorHandler);
 
 const start = async () => {
-  const dbStatus = await connectDB(process.env.MONGO_URI);
+  const dbStatus = await connectDB(envConfig.mongoUri);
   if (!dbStatus?.connected) {
     logger.warn('Server starting without database connection. Some endpoints may be unavailable.');
     if (dbStatus?.error) logger.warn(dbStatus.error.message || dbStatus.error);

@@ -2,11 +2,11 @@ const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 const mongoose = require('mongoose');
 
-const uri = process.env.MONGO_URI;
+const uri = process.env.MONGO_URI || process.env.MONGODB_URI || process.env.DATABASE_URL;
 
 (async () => {
   if (!uri) {
-    console.error('MONGO_URI not set in backend/.env');
+    console.error('MONGO_URI / MONGODB_URI / DATABASE_URL not set in backend/.env');
     process.exit(1);
   }
 

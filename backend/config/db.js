@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const logger = require('../utils/logger');
 
 const connectDB = async (uri) => {
+  uri = uri?.trim() || process.env.MONGODB_URI?.trim() || process.env.DATABASE_URL?.trim();
   if (!uri || !/^mongodb(\+srv)?:\/\//i.test(uri)) {
     logger.warn('MONGO_URI not set or invalid. Skipping MongoDB connection.');
     return { connected: false };

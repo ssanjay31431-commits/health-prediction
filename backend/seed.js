@@ -6,7 +6,8 @@ const logger = require('./utils/logger');
 const seedAdmin = async () => {
   try {
     // Connect to MongoDB
-    await mongoose.connect(process.env.MONGO_URI, {
+    const uri = process.env.MONGO_URI || process.env.MONGODB_URI || process.env.DATABASE_URL;
+    await mongoose.connect(uri, {
       useNewUrlParser: true,
       useUnifiedTopology: true
     });
