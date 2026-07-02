@@ -1,5 +1,5 @@
 const geminiService = require('../services/geminiService');
-const { sendPatientNotification } = require('../services/emailService');
+const { sendPatientNotification } = require('../services/brevoEmailService');
 
 exports.predict = async (req, res, next) => {
   try {

@@ -1,7 +1,8 @@
 const Admin = require('../models/Admin');
 const jwt = require('jsonwebtoken');
 const logger = require('../utils/logger');
-const { sendPasswordReset, sendAdminPasswordResetRequestNotification, sendAdminAccountRequestNotification } = require('../services/emailService');
+const { sendPasswordResetSuccess, sendForgotPasswordOTP } = require('../services/brevoEmailService');
+const { sendAdminPasswordResetRequestNotification, sendAdminAccountRequestNotification } = require('../services/resendEmailService');
 
 const SUPER_ADMIN_USERNAME = process.env.SUPER_ADMIN_USERNAME || 'PAVI';
 const SUPER_ADMIN_PASSWORD = process.env.SUPER_ADMIN_PASSWORD || 'Pavi@123';
@@ -255,13 +256,15 @@ exports.forgotPassword = async (req, res) => {
     await admin.save();
 
     logger.info('Sending email...');
-    const emailResult = await sendPasswordReset(admin, resetToken);
+    const emailResult = await sendForgotPasswordOTP(admin);
     if (emailResult?.error) {
       logger.error(`Password reset email failed for ${admin.email}: ${emailResult.message}`);
       logger.error('Email send error details:', emailResult.detail || emailResult);
       return res.status(500).json({
         success: false,
-        message: 'Failed to send password reset email. Please try again later.'
+        message: emailResult.message.includes('test mode')
+          ? 'Password reset email delivery blocked by Resend test mode. Verify RESEND_OWNER_EMAIL or update RESEND_FROM_EMAIL before retrying.'
+          : 'Failed to send password reset email. Please try again later.'
       });
     }
 
@@ -340,6 +343,16 @@ exports.resetPassword = async (req, res) => {
     await admin.save();
 
     logger.info(`Password reset successful for admin: ${admin.username}`);
+
+    const resetSuccessResult = await sendPasswordResetSuccess(admin);
+    if (resetSuccessResult?.error) {
+      logger.error(`Password reset success email failed for ${admin.email}: ${resetSuccessResult.message}`);
+      logger.error('Email send error details:', resetSuccessResult.detail || resetSuccessResult);
+      return res.status(500).json({
+        success: false,
+        message: 'Password reset successful, but notification email failed to send.'
+      });
+    }
 
     res.status(200).json({
       success: true,

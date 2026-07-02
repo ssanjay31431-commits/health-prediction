@@ -1,5 +1,5 @@
 const repo = require('../services/patientRepo');
-const { sendPatientReport, sendBulkHighRiskAlerts, sendMail } = require('../services/emailService');
+const { sendPatientReportEmail, sendBulkHighRiskAlerts } = require('../services/brevoEmailService');
 const { generatePatientReportPdf } = require('../services/pdfService');
 const logger = require('../utils/logger');
 
@@ -16,7 +16,7 @@ exports.sendEmailToPatient = async (req, res, next) => {
       console.log('Patient email in emailController.sendEmailToPatient:', patient.email);
       console.log('PDF Buffer Length:', pdfBuffer?.length);
       logger.info('Sending email...');
-      const result = await sendPatientReport(patient, pdfBuffer);
+      const result = await sendPatientReportEmail(patient, pdfBuffer);
       if (result.error) {
         logger.warn(`Patient report email failed for ${patient.email}: ${result.message}`);
         logger.error('Email send error details:', result.detail || result);
@@ -65,11 +65,10 @@ exports.sendTestEmail = async (req, res, next) => {
     }
 
     logger.info('Sending email...');
-    const result = await sendMail({
-      to,
-      subject: 'Health Prediction System Test Email',
-      text: `This is a test email sent from the Health Prediction System backend. If you received this, Resend delivery is working correctly for ${to}.`,
-    });
+    const result = await sendPatientReportEmail({
+      email: to,
+      remarks: { possibleCondition: 'Normal', recommendation: 'No action required.' }
+    }, Buffer.from('test-pdf'));
 
     if (result.error) {
       logger.error(`Test email failed for ${to}: ${result.message}`);
@@ -88,19 +87,16 @@ exports.sendTestEmail = async (req, res, next) => {
 exports.sendTestEmailPublic = async (req, res, next) => {
   try {
     const to = process.env.RESEND_OWNER_EMAIL || process.env.SUPPORT_EMAIL || 'ssanjay31431@gmail.com';
-    const from = process.env.RESEND_FROM_EMAIL || 'Health Prediction <onboarding@resend.dev>';
 
-    const result = await sendMail({
-      from,
-      to,
-      subject: 'Health Prediction System - Test Email',
-      html: '<h2>Health Prediction System</h2><p>This is a successful test email from my deployed backend using Resend.</p>',
-    });
+    const result = await sendPatientReportEmail({
+      email: to,
+      remarks: { possibleCondition: 'Normal', recommendation: 'No action required.' }
+    }, Buffer.from('test-pdf'));
 
-    console.log('Resend public test response:', result.response || result);
+    console.log('Brevo public test response:', result.response || result);
 
     if (result.error) {
-      console.error('Resend public test error:', result.detail || result.message || result);
+      console.error('Brevo public test error:', result.detail || result.message || result);
       return res.status(500).json({ success: false, error: result.message || String(result.detail || result) });
     }
 

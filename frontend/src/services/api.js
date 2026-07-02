@@ -1,8 +1,9 @@
 import axios from 'axios'
 
-// Prefer explicit VITE_API_URL, fall back to the current origin /api route.
+// Use explicit VITE_API_URL in production, and fallback to local backend during development.
+const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || '/api',
+  baseURL,
   timeout: 30000, // Increased to 30 seconds for email processing
 })
 

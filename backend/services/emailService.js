@@ -75,6 +75,21 @@ async function sendMail(mailOptions) {
     }));
   }
 
+  if (resendTestMode && options.to && options.to.toString().trim().toLowerCase() !== (adminRecipient || '').toString().trim().toLowerCase()) {
+    const message = `Resend is currently configured in test mode with from address ${resendFromAddress}. Test mode only allows sending to the verified owner email ${adminRecipient}. To send patient emails to other recipients, verify a custom domain at resend.com/domains and set RESEND_FROM_EMAIL to an email address on that domain.`;
+    logger.error(message);
+    return {
+      error: true,
+      message,
+      detail: {
+        type: 'resend_test_mode',
+        from: resendFromAddress,
+        to: options.to,
+        owner: adminRecipient
+      }
+    };
+  }
+
   if (resendTestMode) {
     logger.warn(resendTestModeWarning);
     console.warn(resendTestModeWarning);

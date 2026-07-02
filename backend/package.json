@@ -17,6 +17,7 @@
     "mongoose": "^7.3.1",
     "pdfkit": "^0.13.0",
     "resend": "^6.16.0",
+    "sib-api-v3-sdk": "^8.1.0",
     "twilio": "^4.23.0",
     "winston": "^3.9.0"
   },

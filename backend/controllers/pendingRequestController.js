@@ -1,7 +1,8 @@
 const PendingRequest = require('../models/PendingRequest');
 const Admin = require('../models/Admin');
 const logger = require('../utils/logger');
-const { sendPasswordReset, sendMail } = require('../services/emailService');
+const { sendForgotPasswordOTP } = require('../services/brevoEmailService');
+const { sendMail } = require('../services/resendEmailService');
 
 const expireStalePendingRequests = async () => {
   const now = new Date();
@@ -210,7 +211,7 @@ exports.approvePasswordResetRequest = async (req, res) => {
     await admin.save();
 
     logger.info('Sending email...');
-    const emailResult = await sendPasswordReset(admin, otp);
+    const emailResult = await sendForgotPasswordOTP(admin);
     if (emailResult?.error) {
       logger.error(`Failed to send OTP email to ${admin.email}: ${emailResult.message}`);
       logger.error('Email send error details:', emailResult.detail || emailResult);

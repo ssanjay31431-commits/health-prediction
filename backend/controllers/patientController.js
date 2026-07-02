@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const repo = require('../services/patientRepo');
 const { sendWhatsAppMessage } = require('../services/whatsappService');
-const { sendPatientReport } = require('../services/emailService');
+const { sendPatientReportEmail, sendHighRiskAlert } = require('../services/brevoEmailService');
 const logger = require('../utils/logger');
 const PDFDocument = require('pdfkit');
 
@@ -183,14 +183,28 @@ exports.createPatient = async (req, res, next) => {
     try {
       const pdfBuffer = await generatePatientReportPdf(patient);
       console.log('PDF Buffer Length:', pdfBuffer?.length);
-      logger.info('Sending email...');
-      const emailResult = await sendPatientReport(patient, pdfBuffer);
+      logger.info('Sending patient report email via Brevo...');
+      const emailResult = await sendPatientReportEmail(patient, pdfBuffer);
       if (emailResult?.error) {
         responseMessage = 'Patient saved successfully, but the report email could not be delivered.';
         logger.warn(`Report email failed for patient ${patient._id || patient.id}: ${emailResult.message}`);
         logger.error('Email send error details:', emailResult.detail || emailResult);
       } else {
-        logger.info('Email sent successfully');
+        logger.info('Patient report email sent successfully via Brevo');
+      }
+
+      const isHighRisk = /high/i.test(patient?.remarks?.possibleCondition || '');
+      if (isHighRisk) {
+        try {
+          const highRiskResult = await sendHighRiskAlert(patient);
+          if (highRiskResult?.error) {
+            logger.warn(`High-risk alert email failed for patient ${patient._id || patient.id}: ${highRiskResult.message}`);
+          } else {
+            logger.info(`High-risk alert email sent successfully for patient ${patient._id || patient.id}`);
+          }
+        } catch (highRiskError) {
+          logger.warn(`High-risk alert email failed for patient ${patient._id || patient.id}: ${highRiskError.message}`);
+        }
       }
     } catch (emailError) {
       responseMessage = 'Patient saved successfully, but the report email could not be delivered.';
